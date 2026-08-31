@@ -1052,6 +1052,41 @@ if (error) {
         </div>
       </section>
 
+            {/* MAPA / UBICACIÓN */}
+      <section className="bg-white py-16">
+        <div className="mx-auto max-w-7xl px-5 lg:px-8">
+
+          <div className="mb-8 text-center">
+            <p className="font-black uppercase tracking-[0.2em] text-red-600">
+              Nuestra ubicación
+            </p>
+
+            <h2 className="mt-3 text-3xl font-black text-zinc-950 md:text-4xl">
+              Encuéntranos en Santo Domingo
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-2xl text-zinc-600">
+              Aeropuerto Internacional Las Américas (SDQ), Ruta 66,
+              Punta Caucedo, Boca Chica, República Dominicana.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-zinc-200 shadow-xl">
+            <iframe
+              src="https://www.google.com/maps?q=Aeropuerto%20Internacional%20Las%20Americas%20SDQ%20Punta%20Caucedo%20Boca%20Chica%20Dominican%20Republic&output=embed"
+              width="100%"
+              height="450"
+              style={{ border: 0 }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Ubicación VIP Tourist Transfers CST"
+              className="w-full"
+            />
+          </div>
+
+        </div>
+      </section>
+
       {/* FOOTER */}
 <footer className="bg-black py-12 text-zinc-400">
   <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-3 lg:px-8">
