@@ -8,7 +8,7 @@ import { supabase } from "./lib/supabase";
 export default function Home() {
 const [pickup, setPickup] = useState("");
 const [destination, setDestination] = useState("");
-const [passengers, setPassengers] = useState("1");
+const [passengers, setPassengers] = useState("");
 const [showVehicles, setShowVehicles] = useState(false);
 const [selectedVehicle, setSelectedVehicle] = useState("");
 const [travelTime, setTravelTime] = useState("");
@@ -18,6 +18,111 @@ const [customerPhone, setCustomerPhone] = useState("");
 const [customerEmail, setCustomerEmail] = useState("");
 const [paymentMethod, setPaymentMethod] =
   useState<"card" | "cash" | "">("");
+
+ const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
+const [authName, setAuthName] = useState("");
+const [authEmail, setAuthEmail] = useState("");
+const [authPassword, setAuthPassword] = useState("");
+const [authMessage, setAuthMessage] = useState("");
+const [authLoading, setAuthLoading] = useState(false);
+const [showPassword, setShowPassword] = useState(false);
+const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+useEffect(() => {
+  const loadUser = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    setCurrentUserEmail(session?.user?.email ?? null);
+  };
+
+  loadUser();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    setCurrentUserEmail(session?.user?.email ?? null);
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}, []);
+
+const handleLogout = async () => {
+  await supabase.auth.signOut();
+  setCurrentUserEmail(null);
+};
+
+const handleAuth = async () => {
+  setAuthMessage("");
+
+  if (!authEmail.trim() || !authPassword.trim()) {
+    setAuthMessage("Completa tu correo y contraseña.");
+    return;
+  }
+
+  if (authPassword.length < 6) {
+    setAuthMessage("La contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  setAuthLoading(true);
+
+  try {
+    if (authMode === "register") {
+      if (!authName.trim()) {
+        setAuthMessage("Escribe tu nombre completo.");
+        return;
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email: authEmail.trim(),
+        password: authPassword,
+        options: {
+          data: {
+            full_name: authName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        setAuthMessage(error.message);
+        return;
+      }
+
+      setAuthMessage(
+        "¡Cuenta creada! Revisa tu correo electrónico para confirmar tu cuenta."
+      );
+    }
+
+    if (authMode === "login") {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: authEmail.trim(),
+    password: authPassword,
+  });
+
+  if (error) {
+    setAuthMessage("Correo o contraseña incorrectos.");
+    return;
+  }
+
+  setCurrentUserEmail(data.user?.email ?? null);
+  setAuthMessage("¡Sesión iniciada correctamente!");
+
+  setTimeout(() => {
+    setAuthMode(null);
+    setAuthPassword("");
+  }, 600);
+}
+  } catch (error) {
+    console.error(error);
+    setAuthMessage("Ocurrió un error. Inténtalo nuevamente.");
+  } finally {
+    setAuthLoading(false);
+  }
+};
 
 const [confirmedReservation, setConfirmedReservation] = useState<{
   code: string;
@@ -250,14 +355,192 @@ const finalPrice = (
             </a>
           </nav>
 
-          <a
-            href="#reservar"
-            className="rounded-full bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:bg-red-700"
-          >
-            Reservar ahora
-          </a>
+          <div className="flex items-center gap-3">
+  {currentUserEmail ? (
+  <div className="hidden items-center gap-3 md:flex">
+    <span className="max-w-[180px] truncate text-sm font-bold text-zinc-700">
+      {currentUserEmail}
+    </span>
+
+    <button
+      type="button"
+      onClick={handleLogout}
+      className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
+    >
+      Cerrar sesión
+    </button>
+  </div>
+) : (
+  <>
+    <button
+      type="button"
+      onClick={() => {
+        setAuthMode("login");
+        setAuthMessage("");
+      }}
+      className="hidden rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600 md:inline-flex"
+    >
+      Iniciar sesión
+    </button>
+
+    <button
+      type="button"
+      onClick={() => {
+        setAuthMode("register");
+        setAuthMessage("");
+      }}
+      className="hidden rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 md:inline-flex"
+    >
+      Crear cuenta
+    </button>
+  </>
+)}
+
+  <a
+    href="#reservar"
+    className="rounded-full bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:bg-red-700"
+  >
+    Reservar ahora
+  </a>
+</div>
         </div>
       </header>
+
+      {/* MODAL LOGIN / REGISTRO */}
+{authMode && (
+  <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+    <div className="relative w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl md:p-9">
+
+      <button
+        type="button"
+        onClick={() => {
+          setAuthMode(null);
+          setAuthMessage("");
+          setAuthPassword("");
+        }}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-xl font-black text-zinc-700 transition hover:bg-red-600 hover:text-white"
+        aria-label="Cerrar"
+      >
+        ×
+      </button>
+
+      <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">
+        VIP Tourist Transfers
+      </p>
+
+      <h2 className="mt-3 text-3xl font-black text-zinc-950">
+        {authMode === "register" ? "Crear cuenta" : "Iniciar sesión"}
+      </h2>
+
+      <p className="mt-2 text-sm leading-6 text-zinc-500">
+        {authMode === "register"
+          ? "Crea tu cuenta para gestionar tus viajes y reservas."
+          : "Accede a tu cuenta para continuar."}
+      </p>
+
+      <div className="mt-7 space-y-4">
+
+        {authMode === "register" && (
+          <input
+            type="text"
+            placeholder="Nombre completo"
+            value={authName}
+            onChange={(e) => setAuthName(e.target.value)}
+            className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+          />
+        )}
+
+        <input
+          type="email"
+          placeholder="Correo electrónico"
+          value={authEmail}
+          onChange={(e) => setAuthEmail(e.target.value)}
+          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+        />
+
+        <div className="relative">
+  <input
+    type={showPassword ? "text" : "password"}
+    placeholder="Contraseña"
+    value={authPassword}
+    onChange={(e) => setAuthPassword(e.target.value)}
+    className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 pr-14 outline-none transition focus:border-red-500"
+  />
+
+  <button
+  type="button"
+  onClick={() => setShowPassword(!showPassword)}
+  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 transition hover:text-red-600"
+  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+  title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+>
+  {showPassword ? (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M3 3l18 18" />
+      <path d="M10.6 10.6a2 2 0 002.8 2.8" />
+      <path d="M9.9 4.2A10.8 10.8 0 0112 4c5.5 0 9.5 4.6 10 8-.2 1.3-.9 2.7-2 4" />
+      <path d="M6.6 6.6C4.2 8 2.4 10.2 2 12c.6 3.4 4.5 8 10 8a10.4 10.4 0 004.2-.9" />
+    </svg>
+  ) : (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )}
+</button>
+</div>
+
+        {authMessage && (
+          <p className="rounded-xl bg-zinc-100 p-3 text-sm font-semibold text-zinc-700">
+            {authMessage}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={handleAuth}
+          disabled={authLoading}
+          className="w-full rounded-xl bg-red-600 px-6 py-4 font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {authLoading
+            ? "Procesando..."
+            : authMode === "register"
+            ? "Crear mi cuenta"
+            : "Iniciar sesión"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAuthMode(authMode === "register" ? "login" : "register");
+            setAuthMessage("");
+            setAuthPassword("");
+          }}
+          className="w-full text-sm font-bold text-zinc-600 transition hover:text-red-600"
+        >
+          {authMode === "register"
+            ? "¿Ya tienes cuenta? Inicia sesión"
+            : "¿No tienes cuenta? Crear cuenta"}
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
 
       {/* HERO */}
       <section
@@ -310,22 +593,33 @@ const finalPrice = (
             </div>
 
             <div className="mt-12 grid max-w-xl grid-cols-3 gap-5 border-t border-white/15 pt-7">
-              <div>
-                <p className="text-3xl">🛡️</p>
-                <p className="mt-2 font-black">Seguridad</p>
-                <p className="text-sm text-zinc-400">Garantizada</p>
-              </div>
-              <div>
-                <p className="text-3xl">🚘</p>
-                <p className="mt-2 font-black">Vehículos</p>
-                <p className="text-sm text-zinc-400">Premium</p>
-              </div>
-              <div>
-                <p className="text-3xl">🕐</p>
-                <p className="mt-2 font-black">Atención</p>
-                <p className="text-sm text-zinc-400">24/7</p>
-              </div>
-            </div>
+  <div>
+    <div className="text-4xl leading-none" aria-hidden="true">
+  🛡️
+</div>
+
+    <p className="mt-2 font-black">Seguridad</p>
+    <p className="text-sm text-zinc-400">Garantizada</p>
+  </div>
+
+  <div>
+    <div className="text-4xl leading-none" aria-hidden="true">
+  🚘
+</div>
+
+    <p className="mt-2 font-black">Vehículos</p>
+    <p className="text-sm text-zinc-400">Premium</p>
+  </div>
+
+  <div>
+    <div className="text-4xl leading-none" aria-hidden="true">
+  🕐
+</div>
+
+    <p className="mt-2 font-black">Atención</p>
+    <p className="text-sm text-zinc-400">24/7</p>
+  </div>
+</div>
           </div>
 
           {/* RESERVA */}
@@ -396,7 +690,7 @@ const finalPrice = (
         setConfirmedReservation(null);
         setPickup("");
         setDestination("");
-        setPassengers("1");
+        setPassengers("");
         setTravelDate("");
         setTravelTime("");
         setCustomerName("");
@@ -524,8 +818,9 @@ const finalPrice = (
   onChange={(e) => setPassengers(e.target.value)}
   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none"
 >
-<option value="1">1 pasajero</option>
-<option value="2">2 pasajeros</option>
+  <option value="">Selecciona pasajeros</option>
+  <option value="1">1 pasajero</option>
+  <option value="2">2 pasajeros</option>
 <option value="3">3 pasajeros</option>
 <option value="4">4 pasajeros</option>
 <option value="5">5 pasajeros</option>
@@ -536,13 +831,37 @@ const finalPrice = (
 <option value="10">10 pasajeros</option>
 <option value="11">11 pasajeros</option>
 <option value="12">12 pasajeros</option>
+<option value="13+">13 o más pasajeros</option>
                 </select>
               </div>
 
-  {pickup && destination && (
+  {pickup && destination && passengers !== "13+" && (
   <p className="mb-3 text-center text-xl font-black text-zinc-900">
     Precio del traslado: US${finalPrice}
   </p>
+)}
+
+{passengers === "13+" && (
+  <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-center shadow-sm">
+    <p className="text-lg font-black text-red-700">
+      Cotización personalizada
+    </p>
+
+    <p className="mt-2 text-sm leading-6 text-zinc-600">
+      Para grupos de 13 pasajeros o más, preparamos una solución de transporte personalizada según el tamaño de tu grupo.
+    </p>
+
+    <a
+      href={`https://wa.me/18296502013?text=${encodeURIComponent(
+        `Hola, quiero solicitar una cotización para un grupo de 13 o más pasajeros con VIP Tourist Transfers. Recogida: ${pickup}. Destino: ${destination}.`
+      )}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-[#25D366] px-5 py-3 font-black text-white transition hover:scale-[1.02] hover:bg-[#20bd5a]"
+    >
+      Solicitar cotización por WhatsApp →
+    </a>
+  </div>
 )}
 
 <button
@@ -551,14 +870,15 @@ const finalPrice = (
   e.preventDefault();
 
   if (
-    !pickup ||
-    !destination ||
-    !travelDate ||
-    !travelTime ||
-    !customerName.trim() ||
-    !customerPhone.trim() ||
-    !customerEmail.trim()
-  ) {
+  !pickup ||
+  !destination ||
+  !passengers ||
+  !travelDate ||
+  !travelTime ||
+  !customerName.trim() ||
+  !customerPhone.trim() ||
+  !customerEmail.trim()
+) {
     alert("Por favor, completa todos los datos de la reserva.");
     return;
   }
@@ -567,6 +887,13 @@ const finalPrice = (
     alert("El punto de recogida y el destino no pueden ser iguales.");
     return;
   }
+
+  if (passengers === "13+") {
+  alert(
+    "Para grupos de 13 pasajeros o más, contáctanos para una cotización personalizada."
+  );
+  return;
+}
 
   setSelectedVehicle("");
   setShowVehicles(true);
@@ -874,51 +1201,95 @@ if (error) {
       </section>
 
       {/* SERVICIOS */}
-      <section id="servicios" className="py-24">
-        <div className="mx-auto max-w-7xl px-5 lg:px-8">
-          <div className="max-w-3xl">
-            <p className="font-black uppercase tracking-[0.25em] text-red-600">
-              Nuestros servicios
-            </p>
-            <h2 className="mt-3 text-4xl font-black md:text-5xl">
-              Viaja cómodo. Nosotros nos encargamos del resto.
-            </h2>
-          </div>
+<section id="servicios" className="bg-white py-24">
+  <div className="mx-auto max-w-7xl px-5 lg:px-8">
 
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
-            <article className="rounded-3xl bg-red-600 p-8 text-white shadow-xl">
-              <p className="text-5xl">✈️</p>
-              <h3 className="mt-7 text-2xl font-black">
-                Traslados de aeropuerto
-              </h3>
-              <p className="mt-3 leading-7 text-red-50">
-                Recogida y traslado desde SDQ, PUJ, STI, LRM y otros
-                aeropuertos del país.
-              </p>
-            </article>
+    <div className="mx-auto max-w-3xl text-center">
+      <p className="text-sm font-black uppercase tracking-[0.3em] text-red-600">
+        Nuestros servicios
+      </p>
 
-            <article className="rounded-3xl bg-zinc-950 p-8 text-white shadow-xl">
-              <p className="text-5xl">🚙</p>
-              <h3 className="mt-7 text-2xl font-black">Transporte privado</h3>
-              <p className="mt-3 leading-7 text-zinc-300">
-                Servicio personalizado para parejas, familias, grupos y
-                clientes corporativos.
-              </p>
-            </article>
+      <h2 className="mt-4 text-4xl font-black tracking-tight text-zinc-950 md:text-5xl">
+        Viaja cómodo. Nosotros nos encargamos del resto.
+      </h2>
 
-            <article className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-xl">
-              <p className="text-5xl">🏝️</p>
-              <h3 className="mt-7 text-2xl font-black">
-                Destinos turísticos
-              </h3>
-              <p className="mt-3 leading-7 text-zinc-600">
-                Punta Cana, Santo Domingo, La Romana, Bayahíbe y muchos lugares
-                más.
-              </p>
-            </article>
-          </div>
+      <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-zinc-500">
+        Transporte privado diseñado para ofrecer seguridad, puntualidad,
+        comodidad y una experiencia de primer nivel.
+      </p>
+    </div>
+
+    <div className="mt-14 grid gap-6 md:grid-cols-3">
+
+      {/* TRASLADOS DE AEROPUERTO */}
+      <article className="group rounded-[2rem] bg-gradient-to-br from-red-600 to-red-700 p-8 text-white shadow-xl transition duration-300 hover:-translate-y-2 hover:shadow-2xl">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
+          <div className="text-4xl leading-none" aria-hidden="true">
+  ✈️
+</div>
         </div>
-      </section>
+
+        <p className="mt-8 text-xs font-black uppercase tracking-[0.22em] text-red-100">
+          Aeropuertos
+        </p>
+
+        <h3 className="mt-2 text-2xl font-black">
+          Traslados de aeropuerto
+        </h3>
+
+        <p className="mt-4 leading-7 text-red-50">
+          Recogida y traslado privado desde SDQ, PUJ, STI, LRM y otros
+          aeropuertos de República Dominicana.
+        </p>
+      </article>
+
+      {/* TRANSPORTE PRIVADO */}
+      <article className="group rounded-[2rem] bg-zinc-950 p-8 text-white shadow-xl transition duration-300 hover:-translate-y-2 hover:shadow-2xl">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+          <div className="text-4xl leading-none" aria-hidden="true">
+  🚘
+</div>
+        </div>
+
+        <p className="mt-8 text-xs font-black uppercase tracking-[0.22em] text-red-500">
+          Servicio VIP
+        </p>
+
+        <h3 className="mt-2 text-2xl font-black">
+          Transporte privado
+        </h3>
+
+        <p className="mt-4 leading-7 text-zinc-300">
+          Servicio personalizado para parejas, familias, grupos, ejecutivos
+          y clientes corporativos.
+        </p>
+      </article>
+
+      {/* DESTINOS TURÍSTICOS */}
+      <article className="group rounded-[2rem] border border-zinc-200 bg-white p-8 shadow-xl transition duration-300 hover:-translate-y-2 hover:border-red-200 hover:shadow-2xl">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
+          <div className="text-4xl leading-none" aria-hidden="true">
+  📍
+</div>
+        </div>
+
+        <p className="mt-8 text-xs font-black uppercase tracking-[0.22em] text-red-600">
+          Experiencias
+        </p>
+
+        <h3 className="mt-2 text-2xl font-black text-zinc-950">
+          Destinos turísticos
+        </h3>
+
+        <p className="mt-4 leading-7 text-zinc-600">
+          Punta Cana, Santo Domingo, La Romana, Bayahíbe y muchos otros
+          destinos del país.
+        </p>
+      </article>
+
+    </div>
+  </div>
+</section>
 
       {/* DESTINOS */}
       <section id="destinos" className="bg-zinc-100 py-24">
