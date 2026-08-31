@@ -27,6 +27,20 @@ const [authMessage, setAuthMessage] = useState("");
 const [authLoading, setAuthLoading] = useState(false);
 const [showPassword, setShowPassword] = useState(false);
 const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+const [isNight, setIsNight] = useState(false);
+
+useEffect(() => {
+  const updateMapTheme = () => {
+    const hour = new Date().getHours();
+    setIsNight(hour >= 18 || hour < 6);
+  };
+
+  updateMapTheme();
+
+  const interval = setInterval(updateMapTheme, 60000);
+
+  return () => clearInterval(interval);
+}, []);
 
 useEffect(() => {
   const loadUser = async () => {
@@ -1451,7 +1465,11 @@ if (error) {
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               title="Ubicación VIP Tourist Transfer"
-              className="w-full"
+              className={`w-full transition duration-700 ${
+  isNight
+    ? "invert-[90%] hue-rotate-180 brightness-[85%] contrast-[90%]"
+    : ""
+}`}
             />
           </div>
 
