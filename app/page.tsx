@@ -425,7 +425,7 @@ const finalPrice = (
       </button>
 
       <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">
-        VIP Tourist Transfers
+        VIP Tourist Transfer
       </p>
 
       <h2 className="mt-3 text-3xl font-black text-zinc-950">
@@ -648,7 +648,7 @@ const finalPrice = (
     </h3>
 
     <p className="mt-2 text-sm text-zinc-600">
-      Gracias por reservar con VIP Tourist Transfers.
+      Gracias por reservar con VIP Tourist Transfer.
     </p>
 
     <div className="mt-5 rounded-2xl bg-white p-5 text-left text-sm shadow-sm">
@@ -853,7 +853,7 @@ const finalPrice = (
 
     <a
       href={`https://wa.me/18296502013?text=${encodeURIComponent(
-        `Hola, quiero solicitar una cotización para un grupo de 13 o más pasajeros con VIP Tourist Transfers. Recogida: ${pickup}. Destino: ${destination}.`
+        `Hola, quiero solicitar una cotización para un grupo de 13 o más pasajeros con VIP Tourist Transfer. Recogida: ${pickup}. Destino: ${destination}.`
       )}`}
       target="_blank"
       rel="noopener noreferrer"
@@ -1534,7 +1534,7 @@ if (error) {
         {/* LLAMAR */}
 <a
   href="tel:+18296502013"
-  aria-label="Llamar a VIP Tourist Transfers"
+  aria-label="Llamar a VIP Tourist Transfer"
   title="Llamar"
   className="flex h-12 w-12 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition hover:scale-110 hover:bg-red-700"
 >
@@ -1553,7 +1553,7 @@ if (error) {
           href="https://www.instagram.com/viptouristtransfers"
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Instagram de VIP Tourist Transfers"
+          aria-label="Instagram de VIP Tourist Transfer"
           title="Instagram"
           className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white shadow-lg transition hover:scale-110"
         >
@@ -1614,7 +1614,7 @@ if (error) {
   {/* LLAMAR */}
   <a
     href="tel:+18296502013"
-    aria-label="Llamar a VIP Tourist Transfers"
+    aria-label="Llamar a VIP Tourist Transfer"
     title="Llamar"
     className="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-2xl transition hover:scale-110 hover:bg-red-700"
   >
@@ -1632,7 +1632,7 @@ if (error) {
   href="https://www.instagram.com/viptouristtransfers"
   target="_blank"
   rel="noopener noreferrer"
-  aria-label="Instagram de VIP Tourist Transfers"
+  aria-label="Instagram de VIP Tourist Transfer"
   title="Instagram"
   className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white shadow-2xl transition hover:scale-110"
 >
