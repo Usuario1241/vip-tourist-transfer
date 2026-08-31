@@ -332,7 +332,7 @@ const finalPrice = (
           <a href="#inicio" className="flex items-center">
             <img
               src="/vip-logo-nuevo.png"
-              alt="VIP Tourist Transfers CST"
+              alt="VIP Tourist Transfer"
               className="h-24 w-auto object-contain"
             />
           </a>
@@ -1404,7 +1404,7 @@ if (error) {
         <div className="mx-auto flex max-w-7xl flex-col justify-between gap-8 px-5 md:flex-row md:items-center lg:px-8">
           <div>
             <p className="font-black uppercase tracking-[0.2em] text-red-100">
-              VIP Tourist Transfers CST
+              VIP Tourist Transfer
             </p>
             <h2 className="mt-3 text-4xl font-black">
               ¿Listo para tu próximo viaje?
@@ -1450,7 +1450,7 @@ if (error) {
               style={{ border: 0 }}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="Ubicación VIP Tourist Transfers CST"
+              title="Ubicación VIP Tourist Transfer"
               className="w-full"
             />
           </div>
@@ -1466,7 +1466,7 @@ if (error) {
     <div>
       <img
         src="/vip-logo-nuevo.png"
-        alt="VIP Tourist Transfers CST"
+        alt="VIP Tourist Transfer"
         className="h-24 w-auto rounded-xl bg-white object-contain"
       />
 
