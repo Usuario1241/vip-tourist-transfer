@@ -1599,8 +1599,14 @@ if (error) {
   </div>
 
   <div className="mx-auto mt-10 max-w-7xl border-t border-white/10 px-5 pt-6 text-center text-sm lg:px-8">
-    © 2026 VIP Tourist Transfers CST. Todos los derechos reservados.
-  </div>
+  <p>
+    © 2026 VIP Tourist Transfer. Todos los derechos reservados.
+  </p>
+
+  <p className="mt-2 text-[10px] tracking-wider text-zinc-700">
+    Website by <span className="font-semibold text-zinc-600">Axel Roble</span>
+  </p>
+</div>
 </footer>
 
       <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-3">
