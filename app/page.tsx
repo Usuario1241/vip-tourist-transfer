@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-
 import PayPalPayment from "./PayPalPayment";
 import { supabase } from "./lib/supabase";
+import LocationAutocomplete from "./components/LocationAutocomplete";
 
 
 export default function Home() {
@@ -141,8 +141,12 @@ const handleAuth = async () => {
 const [confirmedReservation, setConfirmedReservation] = useState<{
   code: string;
   name: string;
+  phone: string;
+  email: string;
   pickup: string;
   destination: string;
+  date: string;
+  time: string;
   vehicle: string;
   total: string;
   paymentMethod: "card" | "cash";
@@ -195,20 +199,258 @@ const t = {
 
 const text = t[language];
 
-  const routePrices: Record<string, number> = {
-    "aeropuerto sdq-punta cana": 90,
-"aeropuerto sdq-bavaro": 95,
-"aeropuerto sdq-la romana": 85,
-"aeropuerto sdq-boca chica": 45,
-"aeropuerto sdq-santo domingo": 40,
-"punta cana-aeropuerto sdq": 90,
-"bavaro-aeropuerto sdq": 95,
-"la romana-aeropuerto sdq": 85,
-"boca chica-aeropuerto sdq": 45,
-"santo domingo-aeropuerto sdq": 40,
-  };
+  type VehiclePrice = {
+  sedan: number;
+  suv: number;
+  van: number;
+};
 
-  const zonePrices: Record<string, number> = {
+const tariffPrices: Record<string, VehiclePrice> = {
+  "La Isabela airport (JBQ)": { sedan: 70, suv: 90, van: 120 },
+  "Arena Gorda": { sedan: 155, suv: 180, van: 290 },
+  "Azua": { sedan: 180, suv: 200, van: 280 },
+  "Bani": { sedan: 120, suv: 170, van: 270 },
+  "Barahona": { sedan: 270, suv: 270, van: 270 },
+  "Bavaro": { sedan: 170, suv: 180, van: 290 },
+  "Bayaguana": { sedan: 120, suv: 155, van: 200 },
+  "Bayahibe": { sedan: 140, suv: 150, van: 200 },
+  "Boca Chica": { sedan: 60, suv: 70, van: 120 },
+  "Bonao": { sedan: 160, suv: 170, van: 200 },
+  "Buen Hombre": { sedan: 320, suv: 400, van: 500 },
+  "Cabarete": { sedan: 240, suv: 307, van: 410 },
+  "Cabrera": { sedan: 240, suv: 240, van: 240 },
+  "Cap Cana": { sedan: 160, suv: 170, van: 290 },
+  "Cayo Levantado": { sedan: 190, suv: 195, van: 310 },
+  "Cofresi": { sedan: 262, suv: 307, van: 400 },
+  "Constanza": { sedan: 190, suv: 200, van: 300 },
+  "Consuelo": { sedan: 95, suv: 95, van: 95 },
+  "Cotui": { sedan: 150, suv: 150, van: 150 },
+  "El Cortecito": { sedan: 155, suv: 180, van: 290 },
+  "El Portillo": { sedan: 195, suv: 205, van: 300 },
+  "Gran Bahia Principe La Romana": { sedan: 115, suv: 120, van: 190 },
+  "Gran Bahia Príncipe San Juan": { sedan: 190, suv: 280, van: 370 },
+  "Higuey": { sedan: 130, suv: 160, van: 250 },
+  "Jarabacoa": { sedan: 180, suv: 200, van: 240 },
+  "Juan Dolio": { sedan: 60, suv: 65, van: 115 },
+  "La Romana": { sedan: 115, suv: 120, van: 190 },
+  "La Romana airport (LRM)": { sedan: 115, suv: 120, van: 190 },
+  "La Romana cruise port": { sedan: 115, suv: 120, van: 190 },
+  "La Vega": { sedan: 160, suv: 180, van: 245 },
+  "Laguna Bavaro": { sedan: 155, suv: 180, van: 290 },
+  "Las Galeras": { sedan: 220, suv: 280, van: 340 },
+  "Las Terrenas": { sedan: 190, suv: 210, van: 320 },
+  "Macao": { sedan: 155, suv: 180, van: 290 },
+  "Nagua": { sedan: 160, suv: 200, van: 280 },
+  "Palmar de Ocoa": { sedan: 160, suv: 200, van: 270 },
+  "Pedernales (Dominican Republic)": { sedan: 320, suv: 410, van: 510 },
+  "Pedro Brand": { sedan: 85, suv: 100, van: 210 },
+  "Playa del Cortecito": { sedan: 170, suv: 170, van: 170 },
+  "Playa Dominicus": { sedan: 130, suv: 150, van: 250 },
+  "Playa Dorada": { sedan: 240, suv: 260, van: 440 },
+  "Playa Grande": { sedan: 215, suv: 220, van: 300 },
+  "Playa La Sardina": { sedan: 100, suv: 120, van: 210 },
+  "Puerto Plata": { sedan: 240, suv: 260, van: 440 },
+  "Puerto Plata airport (POP)": { sedan: 240, suv: 260, van: 440 },
+  "Puerto Plata Port": { sedan: 240, suv: 260, van: 440 },
+  "Punta Bonita": { sedan: 190, suv: 210, van: 320 },
+  "Punta Cana airport (PUJ)": { sedan: 155, suv: 180, van: 290 },
+  "Punta Cana town": { sedan: 155, suv: 180, van: 290 },
+  "Rio San Juan": { sedan: 215, suv: 220, van: 300 },
+  "Sabana Grande de Boya": { sedan: 140, suv: 160, van: 210 },
+  "Samana El Catey airport (AZS)": { sedan: 190, suv: 200, van: 320 },
+  "Samana Peninsula": { sedan: 190, suv: 200, van: 320 },
+  "San Cristobal (Dominican Republic)": { sedan: 100, suv: 140, van: 200 },
+  "San Jose de Ocoa": { sedan: 160, suv: 180, van: 210 },
+  "San Juan de La Maguana": { sedan: 260, suv: 300, van: 400 },
+  "San Pedro de Macoris": { sedan: 80, suv: 90, van: 170 },
+  "San Souci": { sedan: 60, suv: 60, van: 60 },
+  "Santiago": { sedan: 170, suv: 190, van: 250 },
+  "Santiago Cibao airport (STI)": { sedan: 170, suv: 190, van: 250 },
+  "Santo Domingo": { sedan: 60, suv: 80, van: 120 },
+  "Sosua": { sedan: 240, suv: 260, van: 440 },
+  "Uvero Alto": { sedan: 190, suv: 210, van: 290 },
+};
+
+const normalizePlace = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[(),.-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizedPickup = normalizePlace(pickup);
+const normalizedDestination = normalizePlace(destination);
+
+const isSdqPickup = [
+  "sdq",
+  "aeropuerto internacional las americas",
+  "aeropuerto las americas",
+  "las americas international airport",
+  "las americas",
+  "punta caucedo",
+].some((alias) => normalizedPickup.includes(alias));
+
+const destinationAliases: Record<string, string[]> = {
+  "La Isabela airport (JBQ)": [
+    "la isabela airport",
+    "aeropuerto la isabela",
+    "aeropuerto internacional dr joaquin balaguer",
+    "joaquin balaguer airport",
+    "jbq",
+  ],
+  "Arena Gorda": ["arena gorda"],
+  "Azua": ["azua"],
+  "Bani": ["bani", "bani republica dominicana"],
+  "Barahona": ["barahona"],
+  "Bavaro": ["bavaro"],
+  "Bayaguana": ["bayaguana"],
+  "Bayahibe": ["bayahibe"],
+  "Boca Chica": ["boca chica"],
+  "Bonao": ["bonao"],
+  "Buen Hombre": ["buen hombre"],
+  "Cabarete": ["cabarete"],
+  "Cabrera": ["cabrera"],
+  "Cap Cana": ["cap cana"],
+  "Cayo Levantado": ["cayo levantado"],
+  "Cofresi": ["cofresi"],
+  "Constanza": ["constanza"],
+  "Consuelo": ["consuelo"],
+  "Cotui": ["cotui"],
+  "El Cortecito": ["el cortecito"],
+  "El Portillo": ["el portillo"],
+  "Gran Bahia Principe La Romana": [
+    "gran bahia principe la romana",
+    "bahia principe la romana",
+  ],
+  "Gran Bahia Príncipe San Juan": [
+    "gran bahia principe san juan",
+    "bahia principe san juan",
+  ],
+  "Higuey": ["higuey"],
+  "Jarabacoa": ["jarabacoa"],
+  "Juan Dolio": ["juan dolio"],
+  "La Romana airport (LRM)": [
+    "la romana international airport",
+    "aeropuerto internacional la romana",
+    "aeropuerto la romana",
+    "lrm",
+  ],
+  "La Romana cruise port": [
+    "la romana cruise port",
+    "puerto de la romana",
+    "la romana port",
+  ],
+  "La Romana": ["la romana"],
+  "La Vega": ["la vega"],
+  "Laguna Bavaro": ["laguna bavaro"],
+  "Las Galeras": ["las galeras"],
+  "Las Terrenas": ["las terrenas"],
+  "Macao": ["macao"],
+  "Nagua": ["nagua"],
+  "Palmar de Ocoa": ["palmar de ocoa"],
+  "Pedernales (Dominican Republic)": ["pedernales"],
+  "Pedro Brand": ["pedro brand"],
+  "Playa del Cortecito": ["playa del cortecito"],
+  "Playa Dominicus": ["playa dominicus", "dominicus"],
+  "Playa Dorada": ["playa dorada"],
+  "Playa Grande": ["playa grande"],
+  "Playa La Sardina": ["playa la sardina"],
+  "Puerto Plata airport (POP)": [
+    "gregorio luperon international airport",
+    "aeropuerto internacional gregorio luperon",
+    "puerto plata airport",
+    "pop",
+  ],
+  "Puerto Plata Port": [
+    "puerto plata port",
+    "puerto de puerto plata",
+    "taino bay",
+    "amber cove",
+  ],
+  "Puerto Plata": ["puerto plata"],
+  "Punta Bonita": ["punta bonita"],
+  "Punta Cana airport (PUJ)": [
+    "punta cana international airport",
+    "aeropuerto internacional de punta cana",
+    "aeropuerto punta cana",
+    "puj",
+  ],
+  "Punta Cana town": [
+    "punta cana",
+    "punta cana village",
+  ],
+  "Rio San Juan": ["rio san juan"],
+  "Sabana Grande de Boya": ["sabana grande de boya"],
+  "Samana El Catey airport (AZS)": [
+    "samana el catey international airport",
+    "el catey international airport",
+    "aeropuerto internacional el catey",
+    "aeropuerto el catey",
+    "azs",
+  ],
+  "Samana Peninsula": [
+    "samana",
+    "santa barbara de samana",
+    "peninsula de samana",
+  ],
+  "San Cristobal (Dominican Republic)": ["san cristobal"],
+  "San Jose de Ocoa": ["san jose de ocoa"],
+  "San Juan de La Maguana": ["san juan de la maguana"],
+  "San Pedro de Macoris": ["san pedro de macoris"],
+  "San Souci": ["san souci", "sans souci"],
+  "Santiago Cibao airport (STI)": [
+    "cibao international airport",
+    "aeropuerto internacional del cibao",
+    "aeropuerto del cibao",
+    "sti",
+  ],
+  "Santiago": ["santiago", "santiago de los caballeros"],
+  "Santo Domingo": [
+    "santo domingo",
+    "distrito nacional",
+  ],
+  "Sosua": ["sosua"],
+  "Uvero Alto": ["uvero alto"],
+};
+
+const destinationHasAlias = (alias: string) => {
+  const normalizedAlias = normalizePlace(alias);
+
+  if (/^[a-z0-9]{2,4}$/.test(normalizedAlias)) {
+    return (` ${normalizedDestination} `).includes(
+      ` ${normalizedAlias} `
+    );
+  }
+
+  return normalizedDestination.includes(normalizedAlias);
+};
+
+const matchingTariff = Object.entries(destinationAliases)
+  .flatMap(([tariffName, aliases]) =>
+    aliases.map((alias) => ({
+      tariffName,
+      alias: normalizePlace(alias),
+    }))
+  )
+  .filter(({ alias }) => destinationHasAlias(alias))
+  .sort((a, b) => b.alias.length - a.alias.length)[0];
+
+const passengerNumber = parseInt(passengers, 10) || 0;
+
+const pricingVehicle: "sedan" | "suv" | "van" =
+  selectedVehicle === "sedan" ||
+  selectedVehicle === "suv" ||
+  selectedVehicle === "van"
+    ? selectedVehicle
+    : passengerNumber <= 3
+    ? "sedan"
+    : passengerNumber <= 6
+    ? "suv"
+    : "van";
+
+const fallbackZonePrices: Record<string, number> = {
   "aeropuerto sdq": 40,
   "aeropuerto puj": 45,
   "distrito nacional": 35,
@@ -216,9 +458,9 @@ const text = t[language];
   "azua": 95,
   "bahoruco": 140,
   "barahona": 135,
-  "dajabón": 160,
+  "dajabon": 160,
   "duarte": 105,
-  "elías piña": 170,
+  "elias pina": 170,
   "el seibo": 90,
   "espaillat": 115,
   "hato mayor": 85,
@@ -227,57 +469,92 @@ const text = t[language];
   "la altagracia": 95,
   "la romana": 85,
   "la vega": 110,
-  "maría trinidad sánchez": 125,
-  "monseñor nouel": 95,
+  "maria trinidad sanchez": 125,
+  "monsenor nouel": 95,
   "monte cristi": 155,
   "monte plata": 70,
   "pedernales": 190,
   "peravia": 75,
   "puerto plata": 145,
-  "samaná": 150,
-  "san cristóbal": 60,
-  "san josé de ocoa": 90,
+  "samana": 150,
+  "san cristobal": 60,
+  "san jose de ocoa": 90,
   "san juan": 135,
-  "san pedro de macorís": 70,
-  "sánchez ramírez": 105,
+  "san pedro de macoris": 70,
+  "sanchez ramirez": 105,
   "santiago": 125,
-  "santiago rodríguez": 145,
+  "santiago rodriguez": 145,
   "valverde": 140,
 };
 
 const pickupAdjustments: Record<string, number> = {
   "aeropuerto sdq": 0,
+  "aeropuerto internacional las americas": 0,
+  "las americas": 0,
   "aeropuerto puj": 25,
+  "punta cana": 25,
   "distrito nacional": 10,
   "santo domingo": 10,
   "santiago": 35,
   "puerto plata": 45,
   "la romana": 20,
   "la altagracia": 25,
-  "samaná": 40,
+  "samana": 40,
 };
 
-const routeKey = `${pickup}-${destination}`;
+const findBestPriceMatch = (
+  text: string,
+  prices: Record<string, number>
+) =>
+  Object.entries(prices)
+    .filter(([zone]) => text.includes(normalizePlace(zone)))
+    .sort(
+      ([zoneA], [zoneB]) =>
+        normalizePlace(zoneB).length -
+        normalizePlace(zoneA).length
+    )[0];
 
-let basePrice =
-  routePrices[routeKey] ??
-  ((zonePrices[destination] ?? 75) +
-    (pickupAdjustments[pickup] ?? 0));
+const fallbackDestinationMatch = findBestPriceMatch(
+  normalizedDestination,
+  fallbackZonePrices
+);
 
-const passengerExtra = parseInt(passengers, 10) >= 4 ? 20 : 0;
+const pickupAdjustmentMatch = findBestPriceMatch(
+  normalizedPickup,
+  pickupAdjustments
+);
 
-const vehicleExtra =
-  selectedVehicle === "suv"
+const fallbackBasePrice =
+  fallbackDestinationMatch?.[1] ?? 75;
+
+const fallbackPickupAdjustment =
+  pickupAdjustmentMatch?.[1] ?? 0;
+
+const fallbackVehicleExtra =
+  pricingVehicle === "suv"
     ? 25
-    : selectedVehicle === "van"
+    : pricingVehicle === "van"
     ? 45
     : 0;
 
-const finalPrice = (
-  basePrice +
-  passengerExtra +
-  vehicleExtra
-).toFixed(2);
+const exactTariffPrice =
+  isSdqPickup && matchingTariff
+    ? tariffPrices[matchingTariff.tariffName][pricingVehicle]
+    : null;
+
+const calculatedPrice =
+  exactTariffPrice ??
+  (
+    fallbackBasePrice +
+    fallbackPickupAdjustment +
+    fallbackVehicleExtra
+  );
+
+const finalPrice = calculatedPrice.toFixed(2);
+
+const passengerCount = parseInt(passengers, 10) || 0;
+const sedanUnavailable = passengerCount >= 4;
+const minivanUnavailable = passengerCount >= 7;
 
  const locations = [
   { name: "Aeropuerto SDQ", subtitle: "Aeropuerto Internacional Las Américas" },
@@ -683,6 +960,22 @@ const finalPrice = (
       </p>
 
       <p className="mt-2">
+  <strong>Fecha:</strong> {confirmedReservation.date}
+</p>
+
+<p className="mt-2">
+  <strong>Hora:</strong> {confirmedReservation.time}
+</p>
+
+<p className="mt-2">
+  <strong>Correo:</strong> {confirmedReservation.email}
+</p>
+
+<p className="mt-2">
+  <strong>Teléfono:</strong> {confirmedReservation.phone}
+</p>
+
+      <p className="mt-2">
         <strong>Vehículo:</strong> {confirmedReservation.vehicle}
       </p>
 
@@ -726,48 +1019,30 @@ const finalPrice = (
   className="mt-7 space-y-4"
 >
               <div>
-                <label className="mb-2 block text-sm font-black">
-                  Punto de recogida
-                </label>
-                <select
-  value={pickup}
-  onChange={(e) => setPickup(e.target.value)}
-  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
->
-  <option value="">Selecciona punto de recogida</option>
+  <label className="mb-2 block text-sm font-black">
+    Punto de recogida
+  </label>
 
-  {locations.map((place) => (
-    <option
-      key={place.name}
-      value={place.name.toLowerCase()}
-    >
-      {place.name} — {place.subtitle}
-    </option>
-  ))}
-</select>
-              </div>
+  <LocationAutocomplete
+    value={pickup}
+    placeholder="Ciudad, hotel, aeropuerto o dirección"
+    onSelect={(place) => setPickup(place.label)}
+    onClear={() => setPickup("")}
+  />
+</div>
 
-              <div>
-                <label className="mb-2 block text-sm font-black">
-                  Destino
-                </label>
-               <select
-  value={destination}
-  onChange={(e) => setDestination(e.target.value)}
-  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
->
-  <option value="">Selecciona destino</option>
+<div>
+  <label className="mb-2 block text-sm font-black">
+    Destino
+  </label>
 
-  {locations.map((place) => (
-    <option
-      key={place.name}
-      value={place.name.toLowerCase()}
-    >
-      {place.name} — {place.subtitle}
-    </option>
-  ))}
-</select>
-              </div>
+  <LocationAutocomplete
+    value={destination}
+    placeholder="¿Adónde quieres ir?"
+    onSelect={(place) => setDestination(place.label)}
+    onClear={() => setDestination("")}
+  />
+</div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -782,12 +1057,40 @@ const finalPrice = (
 
                 <div>
   <label className="mb-2 block text-sm font-black">Hora</label>
-  <input
-    type="time"
+
+  <select
     value={travelTime}
     onChange={(e) => setTravelTime(e.target.value)}
     className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none"
-  />
+  >
+    <option value="">Selecciona una hora</option>
+
+    <option value="12:00 AM">12:00 AM</option>
+    <option value="1:00 AM">1:00 AM</option>
+    <option value="2:00 AM">2:00 AM</option>
+    <option value="3:00 AM">3:00 AM</option>
+    <option value="4:00 AM">4:00 AM</option>
+    <option value="5:00 AM">5:00 AM</option>
+    <option value="6:00 AM">6:00 AM</option>
+    <option value="7:00 AM">7:00 AM</option>
+    <option value="8:00 AM">8:00 AM</option>
+    <option value="9:00 AM">9:00 AM</option>
+    <option value="10:00 AM">10:00 AM</option>
+    <option value="11:00 AM">11:00 AM</option>
+
+    <option value="12:00 PM">12:00 PM</option>
+    <option value="1:00 PM">1:00 PM</option>
+    <option value="2:00 PM">2:00 PM</option>
+    <option value="3:00 PM">3:00 PM</option>
+    <option value="4:00 PM">4:00 PM</option>
+    <option value="5:00 PM">5:00 PM</option>
+    <option value="6:00 PM">6:00 PM</option>
+    <option value="7:00 PM">7:00 PM</option>
+    <option value="8:00 PM">8:00 PM</option>
+    <option value="9:00 PM">9:00 PM</option>
+    <option value="10:00 PM">10:00 PM</option>
+    <option value="11:00 PM">11:00 PM</option>
+  </select>
 </div>
               </div>
 
@@ -829,7 +1132,12 @@ const finalPrice = (
                 </label>
                 <select
   value={passengers}
-  onChange={(e) => setPassengers(e.target.value)}
+  onChange={(e) => {
+  setPassengers(e.target.value);
+  setSelectedVehicle("");
+  setPaymentMethod("");
+  setShowVehicles(false);
+}}
   className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none"
 >
   <option value="">Selecciona pasajeros</option>
@@ -910,7 +1218,8 @@ const finalPrice = (
 }
 
   setSelectedVehicle("");
-  setShowVehicles(true);
+setPaymentMethod("");
+setShowVehicles(true);
 }}
   className="relative z-50 w-full cursor-pointer rounded-xl bg-red-600 px-6 py-4 text-lg font-black text-white"
   >
@@ -929,12 +1238,18 @@ const finalPrice = (
 
       {/* SEDÁN EJECUTIVO */}
       <div
-        onClick={() => setSelectedVehicle("sedan")}
-        className={`rounded-xl border p-4 cursor-pointer ${
-          selectedVehicle === "sedan"
-            ? "border-red-600 ring-2 ring-red-200"
-            : "border-zinc-200"
-        }`}
+        onClick={() =>
+  sedanUnavailable
+    ? alert("El Sedán Ejecutivo admite un máximo de 3 pasajeros.")
+    : setSelectedVehicle("sedan")
+}
+        className={`rounded-xl border p-4 transition ${
+  sedanUnavailable
+    ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
+    : selectedVehicle === "sedan"
+    ? "cursor-pointer border-red-600 ring-2 ring-red-200"
+    : "cursor-pointer border-zinc-200 hover:border-red-400"
+}`}
       >
         <img
           src="/images/sedan-ejecutivo.jpg"
@@ -949,16 +1264,27 @@ const finalPrice = (
         <p className="text-sm text-gray-600">
           Ideal para 1 a 3 pasajeros
         </p>
+        {sedanUnavailable && (
+  <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
+    No disponible para {passengers} pasajeros · Capacidad máxima: 3
+  </p>
+)}
       </div>
 
       {/* MINIVAN PREMIUM */}
       <div
-        onClick={() => setSelectedVehicle("suv")}
-        className={`rounded-xl border p-4 cursor-pointer ${
-          selectedVehicle === "suv"
-            ? "border-red-600 ring-2 ring-red-200"
-            : "border-zinc-200"
-        }`}
+        onClick={() =>
+  minivanUnavailable
+    ? alert("La Minivan Premium admite un máximo de 6 pasajeros.")
+    : setSelectedVehicle("suv")
+}
+        className={`rounded-xl border p-4 transition ${
+  minivanUnavailable
+    ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
+    : selectedVehicle === "suv"
+    ? "cursor-pointer border-red-600 ring-2 ring-red-200"
+    : "cursor-pointer border-zinc-200 hover:border-red-400"
+}`}
       >
         <img
           src="/images/suv-premium.jpg"
@@ -973,6 +1299,11 @@ const finalPrice = (
         <p className="text-sm text-gray-600">
           Ideal para familias y grupos de hasta 6 pasajeros
         </p>
+        {minivanUnavailable && (
+  <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
+    No disponible para {passengers} pasajeros · Capacidad máxima: 6
+  </p>
+)}
       </div>
 
       {/* VAN EJECUTIVA */}
@@ -1023,6 +1354,22 @@ const finalPrice = (
       <p>
         <span className="font-semibold">Pasajeros:</span> {passengers}
       </p>
+
+      <p>
+  <span className="font-semibold">Fecha:</span> {travelDate}
+</p>
+
+<p>
+  <span className="font-semibold">Hora:</span> {travelTime}
+</p>
+
+<p>
+  <span className="font-semibold">Correo:</span> {customerEmail}
+</p>
+
+<p>
+  <span className="font-semibold">Teléfono:</span> {customerPhone}
+</p>
 
       <p>
         <span className="font-semibold">Vehículo:</span>{" "}
@@ -1115,10 +1462,16 @@ const finalPrice = (
   reservation_code: reserva.reservationCode,
   customer_name: reserva.customerName,
   customer_phone: reserva.customerPhone,
+  customer_email: reserva.customerEmail,
   pickup: reserva.pickup,
   destination: reserva.destination,
   passengers: Number(reserva.passengers),
   vehicle: reserva.vehicle,
+  travel_date: reserva.travelDate,
+  travel_time: reserva.travelTime,
+  amount: Number(reserva.amount),
+  payment_method: reserva.paymentMethod,
+  transaction_id: reserva.transactionId,
 });
 
 if (error) {
@@ -1130,6 +1483,10 @@ if (error) {
   setConfirmedReservation({
   code: data.reservationCode,
   name: customerName,
+  phone: customerPhone,
+email: customerEmail,
+date: travelDate,
+time: travelTime,
   pickup: pickup,
   destination: destination,
   vehicle:
@@ -1173,10 +1530,16 @@ if (error) {
   reservation_code: reserva.reservationCode,
   customer_name: reserva.customerName,
   customer_phone: reserva.customerPhone,
+  customer_email: reserva.customerEmail,
   pickup: reserva.pickup,
   destination: reserva.destination,
   passengers: Number(reserva.passengers),
   vehicle: reserva.vehicle,
+  travel_date: reserva.travelDate,
+  travel_time: reserva.travelTime,
+  amount: Number(reserva.amount),
+  payment_method: reserva.paymentMethod,
+  transaction_id: reserva.transactionId,
 });
 
 if (error) {
@@ -1188,6 +1551,10 @@ if (error) {
   setConfirmedReservation({
   code: reservationCode,
   name: customerName,
+  phone: customerPhone,
+email: customerEmail,
+date: travelDate,
+time: travelTime,
   pickup: pickup,
   destination: destination,
   vehicle:
