@@ -2055,6 +2055,15 @@ time: travelTime,
     </a>
 
     <a
+  href="https://www.facebook.com/share/17revdigwc/"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="block transition hover:text-blue-400"
+>
+  Facebook: VIP Tourist Transfer
+</a>
+
+    <a
       href="https://www.google.com/maps/search/?api=1&query=Aeropuerto+Internacional+Las+Americas+Ruta+66+Punta+Caucedo+Boca+Chica"
       target="_blank"
       rel="noopener noreferrer"
@@ -2111,6 +2120,25 @@ time: travelTime,
             <path d="M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5zm0 2a3 3 0 00-3 3v10a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H7zm10.5 1.5a1.25 1.25 0 110 2.5 1.25 1.25 0 010-2.5zM12 7a5 5 0 110 10 5 5 0 010-10zm0 2a3 3 0 100 6 3 3 0 000-6z" />
           </svg>
         </a>
+
+        {/* FACEBOOK */}
+<a
+  href="https://www.facebook.com/share/17revdigwc/"
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Facebook de VIP Tourist Transfer"
+  title="Facebook"
+  className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:scale-110 hover:bg-blue-700"
+>
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className="h-6 w-6"
+    aria-hidden="true"
+  >
+    <path d="M13.5 22v-9h3l.5-3.5h-3.5V7.3c0-1 .3-1.8 1.8-1.8H17V2.4c-.3 0-1.4-.1-2.7-.1-2.7 0-4.6 1.7-4.6 4.7v2.5H7V13h2.7v9h3.8z" />
+  </svg>
+</a>
 
         {/* WHATSAPP */}
 <a
@@ -2188,6 +2216,25 @@ time: travelTime,
     aria-hidden="true"
   >
     <path d="M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5zm0 2a3 3 0 00-3 3v10a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H7zm10.5 1.5a1.25 1.25 0 110 2.5 1.25 1.25 0 010-2.5zM12 7a5 5 0 110 10 5 5 0 010-10zm0 2a3 3 0 100 6 3 3 0 000-6z" />
+  </svg>
+</a>
+
+{/* FACEBOOK */}
+<a
+  href="https://www.facebook.com/share/17revdigwc/"
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Facebook de VIP Tourist Transfer"
+  title="Facebook"
+  className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl transition hover:scale-110 hover:bg-blue-700"
+>
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className="h-7 w-7"
+    aria-hidden="true"
+  >
+    <path d="M13.5 22v-9h3l.5-3.5h-3.5V7.3c0-1 .3-1.8 1.8-1.8H17V2.4c-.3 0-1.4-.1-2.7-.1-2.7 0-4.6 1.7-4.6 4.7v2.5H7V13h2.7v9h3.8z" />
   </svg>
 </a>
 
