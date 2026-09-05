@@ -28,6 +28,7 @@ const [authLoading, setAuthLoading] = useState(false);
 const [showPassword, setShowPassword] = useState(false);
 const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 const [isNight, setIsNight] = useState(false);
+const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 useEffect(() => {
   const updateMapTheme = () => {
@@ -618,84 +619,243 @@ const minivanUnavailable = passengerCount >= 7;
   return (
     <main className="min-h-screen bg-white text-zinc-950">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-3 lg:px-8">
-          <a href="#inicio" className="flex items-center">
-            <img
-              src="/vip-logo-nuevo.png"
-              alt="VIP Tourist Transfer"
-              className="h-24 w-auto object-contain"
-            />
-          </a>
+<header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
 
-          <nav className="hidden items-center gap-8 text-sm font-bold text-zinc-700 lg:flex">
-            <a href="#inicio" className="transition hover:text-red-600">
-              Inicio
-            </a>
-            <a href="#servicios" className="transition hover:text-red-600">
-              Servicios
-            </a>
-            <a href="#destinos" className="transition hover:text-red-600">
-              Destinos
-            </a>
-            <a href="#flota" className="transition hover:text-red-600">
-              Flota
-            </a>
-            <a href="#contacto" className="transition hover:text-red-600">
-              Contacto
-            </a>
-          </nav>
+  <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 lg:px-8">
 
-          <div className="flex items-center gap-3">
-  {currentUserEmail ? (
-  <div className="hidden items-center gap-3 md:flex">
-    <span className="max-w-[180px] truncate text-sm font-bold text-zinc-700">
-      {currentUserEmail}
-    </span>
+    {/* LOGO */}
+    <a
+      href="#inicio"
+      className="flex items-center"
+      onClick={() => setMobileMenuOpen(false)}
+    >
+      <img
+        src="/vip-logo-nuevo.png"
+        alt="VIP Tourist Transfer"
+        className="h-20 w-auto object-contain md:h-24"
+      />
+    </a>
 
+    {/* MENÚ NORMAL - COMPUTADORA */}
+    <nav className="hidden items-center gap-8 text-sm font-bold text-zinc-700 lg:flex">
+      <a href="#inicio" className="transition hover:text-red-600">
+        Inicio
+      </a>
+
+      <a href="#servicios" className="transition hover:text-red-600">
+        Servicios
+      </a>
+
+      <a href="#destinos" className="transition hover:text-red-600">
+        Destinos
+      </a>
+
+      <a href="#flota" className="transition hover:text-red-600">
+        Flota
+      </a>
+
+      <a href="#contacto" className="transition hover:text-red-600">
+        Contacto
+      </a>
+    </nav>
+
+    {/* CUENTA Y RESERVA - COMPUTADORA */}
+    <div className="hidden items-center gap-3 lg:flex">
+
+      {currentUserEmail ? (
+        <>
+          <span className="max-w-[180px] truncate text-sm font-bold text-zinc-700">
+            {currentUserEmail}
+          </span>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
+          >
+            Cerrar sesión
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode("login");
+              setAuthMessage("");
+            }}
+            className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
+          >
+            Iniciar sesión
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode("register");
+              setAuthMessage("");
+            }}
+            className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800"
+          >
+            Crear cuenta
+          </button>
+        </>
+      )}
+
+      <a
+        href="#reservar"
+        className="rounded-full bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:bg-red-700"
+      >
+        Reservar ahora
+      </a>
+
+    </div>
+
+    {/* MENÚ ☰ - CELULAR Y TABLET */}
     <button
       type="button"
-      onClick={handleLogout}
-      className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
+      onClick={() => setMobileMenuOpen((open) => !open)}
+      className="flex items-center gap-3 text-lg font-black text-zinc-950 lg:hidden"
+      aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+      aria-expanded={mobileMenuOpen}
     >
-      Cerrar sesión
+      <span>Menú</span>
+
+      {mobileMenuOpen ? (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="h-8 w-8"
+          aria-hidden="true"
+        >
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      ) : (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="h-8 w-8"
+          aria-hidden="true"
+        >
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      )}
     </button>
+
   </div>
-) : (
-  <>
-    <button
-      type="button"
-      onClick={() => {
-        setAuthMode("login");
-        setAuthMessage("");
-      }}
-      className="hidden rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600 md:inline-flex"
-    >
-      Iniciar sesión
-    </button>
 
-    <button
-      type="button"
-      onClick={() => {
-        setAuthMode("register");
-        setAuthMessage("");
-      }}
-      className="hidden rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 md:inline-flex"
-    >
-      Crear cuenta
-    </button>
-  </>
-)}
+  {/* MENÚ DESPLEGABLE - CELULAR */}
+  {mobileMenuOpen && (
+    <div className="border-t border-zinc-200 bg-white shadow-xl lg:hidden">
 
-  <a
-    href="#reservar"
-    className="rounded-full bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:bg-red-700"
-  >
-    Reservar ahora
-  </a>
-</div>
-        </div>
-      </header>
+      <div className="mx-auto flex max-w-7xl flex-col px-5 py-4">
+
+        <a
+          href="#inicio"
+          onClick={() => setMobileMenuOpen(false)}
+          className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
+        >
+          Inicio
+        </a>
+
+        <a
+          href="#servicios"
+          onClick={() => setMobileMenuOpen(false)}
+          className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
+        >
+          Servicios
+        </a>
+
+        <a
+          href="#destinos"
+          onClick={() => setMobileMenuOpen(false)}
+          className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
+        >
+          Destinos
+        </a>
+
+        <a
+          href="#flota"
+          onClick={() => setMobileMenuOpen(false)}
+          className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
+        >
+          Flota
+        </a>
+
+        <a
+          href="#contacto"
+          onClick={() => setMobileMenuOpen(false)}
+          className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
+        >
+          Contacto
+        </a>
+
+        {/* CUENTA */}
+        {currentUserEmail ? (
+          <div className="mt-5">
+            <p className="mb-3 break-all text-sm font-bold text-zinc-600">
+              {currentUserEmail}
+            </p>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await handleLogout();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full rounded-xl border border-zinc-300 px-5 py-4 font-black text-zinc-900"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-2 gap-3">
+
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("login");
+                setAuthMessage("");
+                setMobileMenuOpen(false);
+              }}
+              className="rounded-xl border border-zinc-300 px-3 py-4 text-sm font-black text-zinc-900"
+            >
+              Iniciar sesión
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("register");
+                setAuthMessage("");
+                setMobileMenuOpen(false);
+              }}
+              className="rounded-xl bg-zinc-950 px-3 py-4 text-sm font-black text-white"
+            >
+              Crear cuenta
+            </button>
+
+          </div>
+        )}
+
+        {/* RESERVA SIN NECESIDAD DE CUENTA */}
+        <a
+          href="#reservar"
+          onClick={() => setMobileMenuOpen(false)}
+          className="mt-4 flex w-full items-center justify-center rounded-xl bg-red-600 px-6 py-4 font-black text-white shadow-lg"
+        >
+          Reservar ahora
+        </a>
+
+      </div>
+    </div>
+  )}
+
+</header>
 
       {/* MODAL LOGIN / REGISTRO */}
 {authMode && (
