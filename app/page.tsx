@@ -8,7 +8,22 @@ import LocationAutocomplete from "./components/LocationAutocomplete";
 export default function Home() {
 const [pickup, setPickup] = useState("");
 const [destination, setDestination] = useState("");
+type SelectedPlace = {
+  label: string;
+  placeId?: string;
+  lat?: number;
+  lng?: number;
+};
+
+const [pickupPlace, setPickupPlace] = useState<SelectedPlace | null>(null);
+const [destinationPlace, setDestinationPlace] =
+  useState<SelectedPlace | null>(null);
+  const [routeDistance, setRouteDistance] = useState("");
+const [routeDuration, setRouteDuration] = useState("");
+const [routeLoading, setRouteLoading] = useState(false);
 const [passengers, setPassengers] = useState("");
+const [largeLuggage, setLargeLuggage] = useState(0);
+const [carryOnLuggage, setCarryOnLuggage] = useState(0);
 const [showVehicles, setShowVehicles] = useState(false);
 const [selectedVehicle, setSelectedVehicle] = useState("");
 const [travelTime, setTravelTime] = useState("");
@@ -42,6 +57,89 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, []);
+
+useEffect(() => {
+  const calculateRoute = async () => {
+    if (
+      !pickupPlace?.lat ||
+      !pickupPlace?.lng ||
+      !destinationPlace?.lat ||
+      !destinationPlace?.lng
+    ) {
+      setRouteDistance("");
+      setRouteDuration("");
+      return;
+    }
+
+    try {
+      setRouteLoading(true);
+
+      const { Route } =
+        await window.google.maps.importLibrary("routes");
+
+      const response = await Route.computeRoutes({
+        origin: {
+          location: {
+            lat: pickupPlace.lat,
+            lng: pickupPlace.lng,
+          },
+        },
+        destination: {
+          location: {
+            lat: destinationPlace.lat,
+            lng: destinationPlace.lng,
+          },
+        },
+        travelMode: "DRIVING",
+        routingPreference: "TRAFFIC_AWARE",
+        fields: ["distanceMeters", "durationMillis"],
+      });
+
+      const route = response.routes?.[0];
+
+      if (!route) {
+        setRouteDistance("");
+        setRouteDuration("");
+        return;
+      }
+
+      const distanceKm =
+        typeof route.distanceMeters === "number"
+          ? route.distanceMeters / 1000
+          : 0;
+
+      const durationMinutes =
+        typeof route.durationMillis === "number"
+          ? Math.round(route.durationMillis / 60000)
+          : 0;
+
+      const hours = Math.floor(durationMinutes / 60);
+      const minutes = durationMinutes % 60;
+
+      setRouteDistance(
+        `${distanceKm.toFixed(1)} km`
+      );
+
+      setRouteDuration(
+        hours > 0
+          ? `${hours} h ${minutes} min`
+          : `${minutes} min`
+      );
+    } catch (error) {
+      console.error(
+        "Error calculando la ruta:",
+        error
+      );
+
+      setRouteDistance("");
+      setRouteDuration("");
+    } finally {
+      setRouteLoading(false);
+    }
+  };
+
+  calculateRoute();
+}, [pickupPlace, destinationPlace]);
 
 useEffect(() => {
   const loadUser = async () => {
@@ -146,6 +244,9 @@ const [confirmedReservation, setConfirmedReservation] = useState<{
   email: string;
   pickup: string;
   destination: string;
+  passengers: string;
+  largeLuggage: number;
+  carryOnLuggage: number;
   date: string;
   time: string;
   vehicle: string;
@@ -440,14 +541,26 @@ const matchingTariff = Object.entries(destinationAliases)
 
 const passengerNumber = parseInt(passengers, 10) || 0;
 
+const sedanFits =
+  passengerNumber <= 3 &&
+  largeLuggage <= 2 &&
+  carryOnLuggage <= 2 &&
+  largeLuggage + carryOnLuggage <= 3;
+
+const minivanFits =
+  passengerNumber <= 6 &&
+  largeLuggage <= 5 &&
+  carryOnLuggage <= 5 &&
+  largeLuggage + carryOnLuggage <= 6;
+
 const pricingVehicle: "sedan" | "suv" | "van" =
   selectedVehicle === "sedan" ||
   selectedVehicle === "suv" ||
   selectedVehicle === "van"
     ? selectedVehicle
-    : passengerNumber <= 3
+    : sedanFits
     ? "sedan"
-    : passengerNumber <= 6
+    : minivanFits
     ? "suv"
     : "van";
 
@@ -554,8 +667,25 @@ const calculatedPrice =
 const finalPrice = calculatedPrice.toFixed(2);
 
 const passengerCount = parseInt(passengers, 10) || 0;
-const sedanUnavailable = passengerCount >= 4;
-const minivanUnavailable = passengerCount >= 7;
+
+// CAPACIDAD DE PASAJEROS + EQUIPAJE
+const sedanUnavailable =
+  passengerCount > 3 ||
+  largeLuggage > 2 ||
+  carryOnLuggage > 2 ||
+  largeLuggage + carryOnLuggage > 3;
+
+const minivanUnavailable =
+  passengerCount > 6 ||
+  largeLuggage > 5 ||
+  carryOnLuggage > 5 ||
+  largeLuggage + carryOnLuggage > 6;
+
+const vanUnavailable =
+  passengerCount > 12 ||
+  largeLuggage > 10 ||
+  carryOnLuggage > 10 ||
+  largeLuggage + carryOnLuggage > 12;
 
  const locations = [
   { name: "Aeropuerto SDQ", subtitle: "Aeropuerto Internacional Las Américas" },
@@ -1120,6 +1250,18 @@ const minivanUnavailable = passengerCount >= 7;
       </p>
 
       <p className="mt-2">
+  <strong>Pasajeros:</strong> {confirmedReservation.passengers}
+</p>
+
+<p className="mt-2">
+  <strong>Maletas grandes:</strong> {confirmedReservation.largeLuggage}
+</p>
+
+<p className="mt-2">
+  <strong>Equipaje de mano:</strong> {confirmedReservation.carryOnLuggage}
+</p>
+
+      <p className="mt-2">
   <strong>Fecha:</strong> {confirmedReservation.date}
 </p>
 
@@ -1158,6 +1300,8 @@ const minivanUnavailable = passengerCount >= 7;
         setPickup("");
         setDestination("");
         setPassengers("");
+        setLargeLuggage(0);
+setCarryOnLuggage(0);
         setTravelDate("");
         setTravelTime("");
         setCustomerName("");
@@ -1184,11 +1328,17 @@ const minivanUnavailable = passengerCount >= 7;
   </label>
 
   <LocationAutocomplete
-    value={pickup}
-    placeholder="Ciudad, hotel, aeropuerto o dirección"
-    onSelect={(place) => setPickup(place.label)}
-    onClear={() => setPickup("")}
-  />
+  value={pickup}
+  placeholder="Ciudad, hotel, aeropuerto o dirección"
+  onSelect={(place) => {
+    setPickup(place.label);
+    setPickupPlace(place);
+  }}
+  onClear={() => {
+    setPickup("");
+    setPickupPlace(null);
+  }}
+/>
 </div>
 
 <div>
@@ -1197,12 +1347,34 @@ const minivanUnavailable = passengerCount >= 7;
   </label>
 
   <LocationAutocomplete
-    value={destination}
-    placeholder="¿Adónde quieres ir?"
-    onSelect={(place) => setDestination(place.label)}
-    onClear={() => setDestination("")}
-  />
+  value={destination}
+  placeholder="¿Adónde quieres ir?"
+  onSelect={(place) => {
+    setDestination(place.label);
+    setDestinationPlace(place);
+  }}
+  onClear={() => {
+    setDestination("");
+    setDestinationPlace(null);
+  }}
+/>
 </div>
+
+{(routeLoading || routeDistance || routeDuration) && (
+  <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+    {routeLoading ? (
+      <p className="text-center text-sm font-bold text-zinc-500">
+        Calculando ruta...
+      </p>
+    ) : (
+      <div className="flex items-center justify-center gap-4 text-sm font-black text-zinc-800">
+        <span>🚗 {routeDistance}</span>
+        <span className="text-zinc-300">•</span>
+        <span>⏱️ {routeDuration}</span>
+      </div>
+    )}
+  </div>
+)}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1317,6 +1489,97 @@ const minivanUnavailable = passengerCount >= 7;
                 </select>
               </div>
 
+              {/* EQUIPAJE */}
+<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+  {/* MALETAS GRANDES */}
+  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+    <p className="text-sm font-black text-zinc-900">
+      Maletas grandes
+    </p>
+
+    <p className="mt-1 text-xs text-zinc-500">
+      Equipaje para bodega
+    </p>
+
+    <div className="mt-3 flex items-center justify-between">
+      <button
+        type="button"
+        onClick={() => {
+  setLargeLuggage((value) => Math.max(0, value - 1));
+  setSelectedVehicle("");
+  setPaymentMethod("");
+  setShowVehicles(false);
+}}
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 bg-white text-xl font-black transition hover:border-red-600 hover:text-red-600"
+      >
+        −
+      </button>
+
+      <span className="text-xl font-black">
+        {largeLuggage}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => {
+  setLargeLuggage((value) => value + 1);
+  setSelectedVehicle("");
+  setPaymentMethod("");
+  setShowVehicles(false);
+}}
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white transition hover:bg-red-700"
+      >
+        +
+      </button>
+    </div>
+  </div>
+
+  {/* EQUIPAJE DE MANO */}
+  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+    <p className="text-sm font-black text-zinc-900">
+      Equipaje de mano
+    </p>
+
+    <p className="mt-1 text-xs text-zinc-500">
+      Mochilas y maletas pequeñas
+    </p>
+
+    <div className="mt-3 flex items-center justify-between">
+      <button
+        type="button"
+        onClick={() => {
+  setCarryOnLuggage((value) => Math.max(0, value - 1));
+  setSelectedVehicle("");
+  setPaymentMethod("");
+  setShowVehicles(false);
+}}
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 bg-white text-xl font-black transition hover:border-red-600 hover:text-red-600"
+      >
+        −
+      </button>
+
+      <span className="text-xl font-black">
+        {carryOnLuggage}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => {
+  setCarryOnLuggage((value) => value + 1);
+  setSelectedVehicle("");
+  setPaymentMethod("");
+  setShowVehicles(false);
+}}
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white transition hover:bg-red-700"
+      >
+        +
+      </button>
+    </div>
+  </div>
+
+</div>
+
   {pickup && destination && passengers !== "13+" && (
   <p className="mb-3 text-center text-xl font-black text-zinc-900">
     Precio del traslado: US${finalPrice}
@@ -1335,7 +1598,7 @@ const minivanUnavailable = passengerCount >= 7;
 
     <a
       href={`https://wa.me/18296502013?text=${encodeURIComponent(
-        `Hola, quiero solicitar una cotización para un grupo de 13 o más pasajeros con VIP Tourist Transfer. Recogida: ${pickup}. Destino: ${destination}.`
+        `Hola, quiero solicitar una cotización para un grupo de 13 o más pasajeros con VIP Tourist Transfer. Recogida: ${pickup}. Destino: ${destination}. Maletas grandes: ${largeLuggage}. Equipaje de mano: ${carryOnLuggage}.`
       )}`}
       target="_blank"
       rel="noopener noreferrer"
@@ -1397,98 +1660,130 @@ setShowVehicles(true);
     <div className="grid gap-4">
 
       {/* SEDÁN EJECUTIVO */}
-      <div
-        onClick={() =>
-  sedanUnavailable
-    ? alert("El Sedán Ejecutivo admite un máximo de 3 pasajeros.")
-    : setSelectedVehicle("sedan")
-}
-        className={`rounded-xl border p-4 transition ${
-  sedanUnavailable
-    ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
-    : selectedVehicle === "sedan"
-    ? "cursor-pointer border-red-600 ring-2 ring-red-200"
-    : "cursor-pointer border-zinc-200 hover:border-red-400"
-}`}
-      >
-        <img
-          src="/images/sedan-ejecutivo.jpg"
-          alt="Sedán Ejecutivo"
-          className="h-40 w-full rounded-lg object-cover"
-        />
+<div
+  onClick={() =>
+    sedanUnavailable
+      ? alert(
+          "El Sedán Ejecutivo no tiene capacidad suficiente para la cantidad de pasajeros o equipaje seleccionada."
+        )
+      : setSelectedVehicle("sedan")
+  }
+  className={`rounded-xl border p-4 transition ${
+    sedanUnavailable
+      ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
+      : selectedVehicle === "sedan"
+      ? "cursor-pointer border-red-600 ring-2 ring-red-200"
+      : "cursor-pointer border-zinc-200 hover:border-red-400"
+  }`}
+>
+  <img
+    src="/images/sedan-ejecutivo.jpg"
+    alt="Sedán Ejecutivo"
+    className="h-40 w-full rounded-lg object-cover"
+  />
 
-        <h4 className="mt-3 text-lg font-bold">
-          Sedán Ejecutivo
-        </h4>
+  <h4 className="mt-3 text-lg font-bold">
+    Sedán Ejecutivo
+  </h4>
 
-        <p className="text-sm text-gray-600">
-          Ideal para 1 a 3 pasajeros
-        </p>
-        {sedanUnavailable && (
-  <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
-    No disponible para {passengers} pasajeros · Capacidad máxima: 3
+  <p className="text-sm text-gray-600">
+    Hasta 3 pasajeros · Equipaje ligero
   </p>
-)}
-      </div>
 
-      {/* MINIVAN PREMIUM */}
-      <div
-        onClick={() =>
-  minivanUnavailable
-    ? alert("La Minivan Premium admite un máximo de 6 pasajeros.")
-    : setSelectedVehicle("suv")
-}
-        className={`rounded-xl border p-4 transition ${
-  minivanUnavailable
-    ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
-    : selectedVehicle === "suv"
-    ? "cursor-pointer border-red-600 ring-2 ring-red-200"
-    : "cursor-pointer border-zinc-200 hover:border-red-400"
-}`}
-      >
-        <img
-          src="/images/suv-premium.jpg"
-          alt="Minivan Premium"
-          className="h-40 w-full rounded-lg object-cover"
-        />
-
-        <h4 className="mt-3 text-lg font-bold">
-          Minivan Premium
-        </h4>
-
-        <p className="text-sm text-gray-600">
-          Ideal para familias y grupos de hasta 6 pasajeros
-        </p>
-        {minivanUnavailable && (
-  <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
-    No disponible para {passengers} pasajeros · Capacidad máxima: 6
+  <p className="mt-1 text-xs font-semibold text-zinc-500">
+    Hasta 2 maletas grandes + equipaje de mano
   </p>
-)}
-      </div>
 
-      {/* VAN EJECUTIVA */}
-      <div
-        onClick={() => setSelectedVehicle("van")}
-        className={`rounded-xl border p-4 cursor-pointer ${
-          selectedVehicle === "van"
-            ? "border-red-600 ring-2 ring-red-200"
-            : "border-zinc-200"
-        }`}
-      >
-        <img
-          src="/images/van-ejecutiva.jpg"
-          alt="Van Ejecutiva"
-          className="h-40 w-full rounded-lg object-cover"
-        />
+  {sedanUnavailable && (
+    <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
+      No disponible para la cantidad de pasajeros o equipaje seleccionada
+    </p>
+  )}
+</div>
 
-        <h4 className="mt-3 text-lg font-bold">
-          Van Ejecutiva
-        </h4>
+{/* MINIVAN PREMIUM */}
+<div
+  onClick={() =>
+    minivanUnavailable
+      ? alert(
+          "La Minivan Premium no tiene capacidad suficiente para la cantidad de pasajeros o equipaje seleccionada."
+        )
+      : setSelectedVehicle("suv")
+  }
+  className={`rounded-xl border p-4 transition ${
+    minivanUnavailable
+      ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
+      : selectedVehicle === "suv"
+      ? "cursor-pointer border-red-600 ring-2 ring-red-200"
+      : "cursor-pointer border-zinc-200 hover:border-red-400"
+  }`}
+>
+  <img
+    src="/images/suv-premium.jpg"
+    alt="Minivan Premium"
+    className="h-40 w-full rounded-lg object-cover"
+  />
 
-        <p className="text-sm text-gray-600">
-          Ideal para grupos de hasta 12 pasajeros
-        </p>
-      </div>
+  <h4 className="mt-3 text-lg font-bold">
+    Minivan Premium
+  </h4>
+
+  <p className="text-sm text-gray-600">
+    Hasta 6 pasajeros · Equipaje familiar
+  </p>
+
+  <p className="mt-1 text-xs font-semibold text-zinc-500">
+    Hasta 5 maletas grandes + equipaje de mano
+  </p>
+
+  {minivanUnavailable && (
+    <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
+      No disponible para la cantidad de pasajeros o equipaje seleccionada
+    </p>
+  )}
+</div>
+
+{/* VAN EJECUTIVA */}
+<div
+  onClick={() =>
+    vanUnavailable
+      ? alert(
+          "La Van Ejecutiva no tiene capacidad suficiente para la cantidad de pasajeros o equipaje seleccionada."
+        )
+      : setSelectedVehicle("van")
+  }
+  className={`rounded-xl border p-4 transition ${
+    vanUnavailable
+      ? "cursor-not-allowed border-zinc-300 bg-zinc-100 opacity-50 grayscale"
+      : selectedVehicle === "van"
+      ? "cursor-pointer border-red-600 ring-2 ring-red-200"
+      : "cursor-pointer border-zinc-200 hover:border-red-400"
+  }`}
+>
+  <img
+    src="/images/van-ejecutiva.jpg"
+    alt="Van Ejecutiva"
+    className="h-40 w-full rounded-lg object-cover"
+  />
+
+  <h4 className="mt-3 text-lg font-bold">
+    Van Ejecutiva
+  </h4>
+
+  <p className="text-sm text-gray-600">
+    Hasta 12 pasajeros · Gran capacidad de equipaje
+  </p>
+
+  <p className="mt-1 text-xs font-semibold text-zinc-500">
+    Hasta 10 maletas grandes + equipaje de mano
+  </p>
+
+  {vanUnavailable && (
+    <p className="mt-3 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
+      No disponible para la cantidad de pasajeros o equipaje seleccionada
+    </p>
+  )}
+</div>
 
     </div>
   </div>
@@ -1525,6 +1820,14 @@ setShowVehicles(true);
 
 <p>
   <span className="font-semibold">Correo:</span> {customerEmail}
+</p>
+
+<p>
+  <span className="font-semibold">Maletas grandes:</span> {largeLuggage}
+</p>
+
+<p>
+  <span className="font-semibold">Equipaje de mano:</span> {carryOnLuggage}
 </p>
 
 <p>
@@ -1626,6 +1929,8 @@ setShowVehicles(true);
   pickup: reserva.pickup,
   destination: reserva.destination,
   passengers: Number(reserva.passengers),
+  large_luggage: largeLuggage,
+carry_on_luggage: carryOnLuggage,
   vehicle: reserva.vehicle,
   travel_date: reserva.travelDate,
   travel_time: reserva.travelTime,
@@ -1644,11 +1949,14 @@ if (error) {
   code: data.reservationCode,
   name: customerName,
   phone: customerPhone,
-email: customerEmail,
-date: travelDate,
-time: travelTime,
+  email: customerEmail,
+  date: travelDate,
+  time: travelTime,
   pickup: pickup,
   destination: destination,
+  passengers: passengers,
+  largeLuggage: largeLuggage,
+  carryOnLuggage: carryOnLuggage,
   vehicle:
     selectedVehicle === "sedan"
       ? "Sedán Ejecutivo"
@@ -1694,6 +2002,8 @@ time: travelTime,
   pickup: reserva.pickup,
   destination: reserva.destination,
   passengers: Number(reserva.passengers),
+  large_luggage: largeLuggage,
+carry_on_luggage: carryOnLuggage,
   vehicle: reserva.vehicle,
   travel_date: reserva.travelDate,
   travel_time: reserva.travelTime,
@@ -1712,11 +2022,14 @@ if (error) {
   code: reservationCode,
   name: customerName,
   phone: customerPhone,
-email: customerEmail,
-date: travelDate,
-time: travelTime,
+  email: customerEmail,
+  date: travelDate,
+  time: travelTime,
   pickup: pickup,
   destination: destination,
+  passengers: passengers,
+  largeLuggage: largeLuggage,
+  carryOnLuggage: carryOnLuggage,
   vehicle:
     selectedVehicle === "sedan"
       ? "Sedán Ejecutivo"
