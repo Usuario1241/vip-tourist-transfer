@@ -227,10 +227,10 @@ export default function LocationAutocomplete({
       });
 
       const label =
-        place.formattedAddress ||
-        place.displayName ||
-        prediction.text?.toString() ||
-        "";
+  prediction.text?.toString() ||
+  place.formattedAddress ||
+  place.displayName ||
+  "";
 
       setInputValue(label);
       setSuggestions([]);

@@ -28,9 +28,13 @@ const [showVehicles, setShowVehicles] = useState(false);
 const [selectedVehicle, setSelectedVehicle] = useState("");
 const [travelTime, setTravelTime] = useState("");
 const [travelDate, setTravelDate] = useState("");
+const [tripType, setTripType] = useState<"oneway" | "roundtrip" | "">("");
+const [returnDate, setReturnDate] = useState("");
+const [returnTime, setReturnTime] = useState("");
 const [customerName, setCustomerName] = useState("");
 const [customerPhone, setCustomerPhone] = useState("");
 const [customerEmail, setCustomerEmail] = useState("");
+const [flightNumber, setFlightNumber] = useState("");
 const [paymentMethod, setPaymentMethod] =
   useState<"card" | "cash" | "">("");
 
@@ -44,6 +48,21 @@ const [showPassword, setShowPassword] = useState(false);
 const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 const [isNight, setIsNight] = useState(false);
 const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+type Review = {
+  id: number;
+  name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+};
+
+const [reviews, setReviews] = useState<Review[]>([]);
+const [reviewName, setReviewName] = useState("");
+const [reviewRating, setReviewRating] = useState(5);
+const [reviewComment, setReviewComment] = useState("");
+const [reviewSending, setReviewSending] = useState(false);
+const [reviewMessage, setReviewMessage] = useState("");
 
 useEffect(() => {
   const updateMapTheme = () => {
@@ -163,6 +182,77 @@ useEffect(() => {
   };
 }, []);
 
+useEffect(() => {
+  const loadReviews = async () => {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select("id, name, rating, comment, created_at")
+      .eq("approved", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error cargando opiniones:", error);
+      return;
+    }
+
+    setReviews(data || []);
+  };
+
+  loadReviews();
+}, []);
+
+const handleReviewSubmit = async () => {
+  setReviewMessage("");
+
+  const cleanName = reviewName.trim();
+  const cleanComment = reviewComment.trim();
+
+  if (!cleanName) {
+    setReviewMessage("Escribe tu nombre.");
+    return;
+  }
+
+  if (cleanComment.length < 3) {
+    setReviewMessage("Escribe un comentario de al menos 3 caracteres.");
+    return;
+  }
+
+  if (cleanComment.length > 500) {
+    setReviewMessage("El comentario no puede superar los 500 caracteres.");
+    return;
+  }
+
+  setReviewSending(true);
+
+  try {
+    const { error } = await supabase
+      .from("reviews")
+      .insert({
+        name: cleanName,
+        rating: reviewRating,
+        comment: cleanComment,
+      });
+
+    if (error) {
+      console.error("Error enviando opinión:", error);
+      setReviewMessage("No se pudo enviar tu opinión. Inténtalo nuevamente.");
+      return;
+    }
+
+    setReviewName("");
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewMessage(
+      "¡Gracias! Tu opinión fue enviada y será publicada después de ser revisada."
+    );
+  } catch (error) {
+    console.error("Error enviando opinión:", error);
+    setReviewMessage("No se pudo enviar tu opinión. Inténtalo nuevamente.");
+  } finally {
+    setReviewSending(false);
+  }
+};
+
 const handleLogout = async () => {
   await supabase.auth.signOut();
   setCurrentUserEmail(null);
@@ -242,6 +332,7 @@ const [confirmedReservation, setConfirmedReservation] = useState<{
   name: string;
   phone: string;
   email: string;
+  flightNumber: string;
   pickup: string;
   destination: string;
   passengers: string;
@@ -249,6 +340,9 @@ const [confirmedReservation, setConfirmedReservation] = useState<{
   carryOnLuggage: number;
   date: string;
   time: string;
+  tripType: "oneway" | "roundtrip";
+returnDate: string;
+returnTime: string;
   vehicle: string;
   total: string;
   paymentMethod: "card" | "cash";
@@ -385,14 +479,22 @@ const normalizePlace = (value: string) =>
 const normalizedPickup = normalizePlace(pickup);
 const normalizedDestination = normalizePlace(destination);
 
-const isSdqPickup = [
+const sdqAliases = [
   "sdq",
   "aeropuerto internacional las americas",
   "aeropuerto las americas",
   "las americas international airport",
   "las americas",
   "punta caucedo",
-].some((alias) => normalizedPickup.includes(alias));
+];
+
+const isSdqPickup = sdqAliases.some((alias) =>
+  normalizedPickup.includes(alias)
+);
+
+const isSdqDestination = sdqAliases.some((alias) =>
+  normalizedDestination.includes(alias)
+);
 
 const destinationAliases: Record<string, string[]> = {
   "La Isabela airport (JBQ)": [
@@ -517,17 +619,19 @@ const destinationAliases: Record<string, string[]> = {
   "Uvero Alto": ["uvero alto"],
 };
 
-const destinationHasAlias = (alias: string) => {
+const placeHasAlias = (place: string, alias: string) => {
   const normalizedAlias = normalizePlace(alias);
 
   if (/^[a-z0-9]{2,4}$/.test(normalizedAlias)) {
-    return (` ${normalizedDestination} `).includes(
-      ` ${normalizedAlias} `
-    );
+    return (` ${place} `).includes(` ${normalizedAlias} `);
   }
 
-  return normalizedDestination.includes(normalizedAlias);
+  return place.includes(normalizedAlias);
 };
+
+const tariffSearchPlace = isSdqDestination
+  ? normalizedPickup
+  : normalizedDestination;
 
 const matchingTariff = Object.entries(destinationAliases)
   .flatMap(([tariffName, aliases]) =>
@@ -536,7 +640,7 @@ const matchingTariff = Object.entries(destinationAliases)
       alias: normalizePlace(alias),
     }))
   )
-  .filter(({ alias }) => destinationHasAlias(alias))
+  .filter(({ alias }) => placeHasAlias(tariffSearchPlace, alias))
   .sort((a, b) => b.alias.length - a.alias.length)[0];
 
 const passengerNumber = parseInt(passengers, 10) || 0;
@@ -564,107 +668,167 @@ const pricingVehicle: "sedan" | "suv" | "van" =
     ? "suv"
     : "van";
 
-const fallbackZonePrices: Record<string, number> = {
-  "aeropuerto sdq": 40,
-  "aeropuerto puj": 45,
-  "distrito nacional": 35,
-  "santo domingo": 35,
-  "azua": 95,
-  "bahoruco": 140,
-  "barahona": 135,
-  "dajabon": 160,
-  "duarte": 105,
-  "elias pina": 170,
-  "el seibo": 90,
-  "espaillat": 115,
-  "hato mayor": 85,
-  "hermanas mirabal": 115,
-  "independencia": 160,
-  "la altagracia": 95,
-  "la romana": 85,
-  "la vega": 110,
-  "maria trinidad sanchez": 125,
-  "monsenor nouel": 95,
-  "monte cristi": 155,
-  "monte plata": 70,
-  "pedernales": 190,
-  "peravia": 75,
-  "puerto plata": 145,
-  "samana": 150,
-  "san cristobal": 60,
-  "san jose de ocoa": 90,
-  "san juan": 135,
-  "san pedro de macoris": 70,
-  "sanchez ramirez": 105,
-  "santiago": 125,
-  "santiago rodriguez": 145,
-  "valverde": 140,
-};
+// ============================================================
+// MOTOR DE PRECIOS VIP TOURIST TRANSFER
+// 1. Rutas desde SDQ incluidas en el tarifario = precio oficial.
+// 2. Otras rutas = cálculo por distancia real de Google Maps.
+// 3. Nunca usar un precio genérico de US$75 para rutas largas.
+// 4. Al final se aplica el 6%.
+// ============================================================
 
-const pickupAdjustments: Record<string, number> = {
-  "aeropuerto sdq": 0,
-  "aeropuerto internacional las americas": 0,
-  "las americas": 0,
-  "aeropuerto puj": 25,
-  "punta cana": 25,
-  "distrito nacional": 10,
-  "santo domingo": 10,
-  "santiago": 35,
-  "puerto plata": 45,
-  "la romana": 20,
-  "la altagracia": 25,
-  "samana": 40,
-};
+const distanceKm = (() => {
+  if (!routeDistance) return 0;
 
-const findBestPriceMatch = (
-  text: string,
-  prices: Record<string, number>
-) =>
-  Object.entries(prices)
-    .filter(([zone]) => text.includes(normalizePlace(zone)))
-    .sort(
-      ([zoneA], [zoneB]) =>
-        normalizePlace(zoneB).length -
-        normalizePlace(zoneA).length
-    )[0];
+  const parsed = parseFloat(
+    routeDistance
+      .replace(",", ".")
+      .replace(/[^\d.]/g, "")
+  );
 
-const fallbackDestinationMatch = findBestPriceMatch(
-  normalizedDestination,
-  fallbackZonePrices
-);
+  return Number.isFinite(parsed) ? parsed : 0;
+})();
 
-const pickupAdjustmentMatch = findBestPriceMatch(
-  normalizedPickup,
-  pickupAdjustments
-);
 
-const fallbackBasePrice =
-  fallbackDestinationMatch?.[1] ?? 75;
-
-const fallbackPickupAdjustment =
-  pickupAdjustmentMatch?.[1] ?? 0;
-
-const fallbackVehicleExtra =
-  pricingVehicle === "suv"
-    ? 25
-    : pricingVehicle === "van"
-    ? 45
-    : 0;
+// ------------------------------------------------------------
+// TARIFA OFICIAL CUANDO LA RECOGIDA ES SDQ
+// ------------------------------------------------------------
 
 const exactTariffPrice =
-  isSdqPickup && matchingTariff
+  (isSdqPickup || isSdqDestination) && matchingTariff
     ? tariffPrices[matchingTariff.tariffName][pricingVehicle]
     : null;
 
-const calculatedPrice =
-  exactTariffPrice ??
-  (
-    fallbackBasePrice +
-    fallbackPickupAdjustment +
-    fallbackVehicleExtra
-  );
 
-const finalPrice = calculatedPrice.toFixed(2);
+// ------------------------------------------------------------
+// PRECIO POR DISTANCIA
+// Se utiliza cuando la ruta NO está cubierta directamente
+// por el tarifario oficial desde SDQ.
+// ------------------------------------------------------------
+
+const calculateDistancePrice = (
+  km: number,
+  vehicle: "sedan" | "suv" | "van"
+) => {
+  if (km <= 0) {
+    return 0;
+  }
+
+  let sedanPrice = 0;
+
+  // RUTAS CORTAS
+  if (km <= 20) {
+    sedanPrice = 45;
+  }
+
+  // 21 - 40 KM
+  else if (km <= 40) {
+    sedanPrice = 60;
+  }
+
+  // 41 - 70 KM
+  else if (km <= 70) {
+    sedanPrice = 85;
+  }
+
+  // 71 - 100 KM
+  else if (km <= 100) {
+    sedanPrice = 115;
+  }
+
+  // 101 - 140 KM
+  else if (km <= 140) {
+    sedanPrice = 145;
+  }
+
+  // 141 - 180 KM
+  else if (km <= 180) {
+    sedanPrice = 175;
+  }
+
+  // 181 - 220 KM
+  else if (km <= 220) {
+    sedanPrice = 205;
+  }
+
+  // 221 - 260 KM
+  else if (km <= 260) {
+    sedanPrice = 235;
+  }
+
+  // 261 - 300 KM
+  else if (km <= 300) {
+    sedanPrice = 265;
+  }
+
+  // 301 - 350 KM
+  else if (km <= 350) {
+    sedanPrice = 300;
+  }
+
+  // 351 - 400 KM
+  else if (km <= 400) {
+    sedanPrice = 340;
+  }
+
+  // MÁS DE 400 KM
+  else {
+    sedanPrice = 340 + Math.ceil((km - 400) / 25) * 20;
+  }
+
+
+  // ----------------------------------------------------------
+  // AJUSTE SEGÚN VEHÍCULO
+  // ----------------------------------------------------------
+
+  if (vehicle === "suv") {
+    return Math.round(sedanPrice * 1.20);
+  }
+
+  if (vehicle === "van") {
+    return Math.round(sedanPrice * 1.55);
+  }
+
+  return sedanPrice;
+};
+
+
+// ------------------------------------------------------------
+// PRECIO CALCULADO DE LA RUTA
+// ------------------------------------------------------------
+
+const distanceBasedPrice =
+  distanceKm > 0
+    ? calculateDistancePrice(distanceKm, pricingVehicle)
+    : 0;
+
+
+// ------------------------------------------------------------
+// PRIORIDAD DEL MOTOR
+//
+// 1. Si existe precio oficial SDQ → destino, usar tarifario.
+// 2. Si no existe, usar distancia real.
+// 3. Si Google todavía está calculando, precio = 0.
+// ------------------------------------------------------------
+
+const calculatedPrice =
+  exactTariffPrice !== null
+    ? exactTariffPrice
+    : distanceBasedPrice;
+
+
+// ------------------------------------------------------------
+// 6% ADICIONAL
+// ------------------------------------------------------------
+
+const tripPrice =
+  tripType === "roundtrip"
+    ? calculatedPrice * 2
+    : calculatedPrice;
+
+const finalPrice =
+  tripPrice > 0
+    ? (tripPrice * 1.06).toFixed(2)
+    : "0.00";
 
 const passengerCount = parseInt(passengers, 10) || 0;
 
@@ -783,6 +947,10 @@ const vanUnavailable =
       <a href="#flota" className="transition hover:text-red-600">
         Flota
       </a>
+
+      <a href="#opiniones" className="transition hover:text-red-600">
+  Opiniones
+</a>
 
       <a href="#contacto" className="transition hover:text-red-600">
         Contacto
@@ -915,6 +1083,14 @@ const vanUnavailable =
         >
           Flota
         </a>
+
+        <a
+  href="#opiniones"
+  onClick={() => setMobileMenuOpen(false)}
+  className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
+>
+  Opiniones
+</a>
 
         <a
           href="#contacto"
@@ -1270,12 +1446,37 @@ const vanUnavailable =
 </p>
 
 <p className="mt-2">
+  <strong>Tipo de viaje:</strong>{" "}
+  {confirmedReservation.tripType === "roundtrip"
+    ? "Ida y vuelta"
+    : "Solo ida"}
+</p>
+
+{confirmedReservation.tripType === "roundtrip" && (
+  <>
+    <p className="mt-2">
+      <strong>Fecha de regreso:</strong> {confirmedReservation.returnDate}
+    </p>
+
+    <p className="mt-2">
+      <strong>Hora de regreso:</strong> {confirmedReservation.returnTime}
+    </p>
+  </>
+)}
+
+<p className="mt-2">
   <strong>Correo:</strong> {confirmedReservation.email}
 </p>
 
 <p className="mt-2">
   <strong>Teléfono:</strong> {confirmedReservation.phone}
 </p>
+
+{confirmedReservation.flightNumber && (
+  <p className="mt-2">
+    <strong>Número de vuelo:</strong> {confirmedReservation.flightNumber}
+  </p>
+)}
 
       <p className="mt-2">
         <strong>Vehículo:</strong> {confirmedReservation.vehicle}
@@ -1304,9 +1505,13 @@ const vanUnavailable =
 setCarryOnLuggage(0);
         setTravelDate("");
         setTravelTime("");
+        setTripType("");
+setReturnDate("");
+setReturnTime("");
         setCustomerName("");
         setCustomerPhone("");
         setCustomerEmail("");
+        setFlightNumber("");
         setSelectedVehicle("");
         setPaymentMethod("");
         setShowVehicles(false);
@@ -1358,6 +1563,42 @@ setCarryOnLuggage(0);
     setDestinationPlace(null);
   }}
 />
+</div>
+
+<div>
+  <label className="mb-2 block text-sm font-black">
+    Tipo de viaje
+  </label>
+
+  <div className="grid grid-cols-2 gap-3">
+    <button
+      type="button"
+      onClick={() => {
+        setTripType("oneway");
+        setReturnDate("");
+        setReturnTime("");
+      }}
+      className={`rounded-xl border px-4 py-4 font-black transition ${
+        tripType === "oneway"
+          ? "border-red-600 bg-red-600 text-white"
+          : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-red-400"
+      }`}
+    >
+      ➡️ Solo ida
+    </button>
+
+    <button
+      type="button"
+      onClick={() => setTripType("roundtrip")}
+      className={`rounded-xl border px-4 py-4 font-black transition ${
+        tripType === "roundtrip"
+          ? "border-red-600 bg-red-600 text-white"
+          : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-red-400"
+      }`}
+    >
+      🔄 Ida y vuelta
+    </button>
+  </div>
 </div>
 
 {(routeLoading || routeDistance || routeDuration) && (
@@ -1426,6 +1667,70 @@ setCarryOnLuggage(0);
 </div>
               </div>
 
+              {tripType === "roundtrip" && (
+  <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+    <p className="mb-3 text-sm font-black text-red-700">
+      🔄 Datos del viaje de regreso
+    </p>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="mb-2 block text-sm font-black">
+          Fecha de regreso
+        </label>
+
+        <input
+          type="date"
+          value={returnDate}
+          min={travelDate || undefined}
+          onChange={(e) => setReturnDate(e.target.value)}
+          className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-4 outline-none focus:border-red-500"
+        />
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-black">
+          Hora de regreso
+        </label>
+
+        <select
+          value={returnTime}
+          onChange={(e) => setReturnTime(e.target.value)}
+          className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-4 outline-none focus:border-red-500"
+        >
+          <option value="">Selecciona una hora</option>
+
+          <option value="12:00 AM">12:00 AM</option>
+          <option value="1:00 AM">1:00 AM</option>
+          <option value="2:00 AM">2:00 AM</option>
+          <option value="3:00 AM">3:00 AM</option>
+          <option value="4:00 AM">4:00 AM</option>
+          <option value="5:00 AM">5:00 AM</option>
+          <option value="6:00 AM">6:00 AM</option>
+          <option value="7:00 AM">7:00 AM</option>
+          <option value="8:00 AM">8:00 AM</option>
+          <option value="9:00 AM">9:00 AM</option>
+          <option value="10:00 AM">10:00 AM</option>
+          <option value="11:00 AM">11:00 AM</option>
+
+          <option value="12:00 PM">12:00 PM</option>
+          <option value="1:00 PM">1:00 PM</option>
+          <option value="2:00 PM">2:00 PM</option>
+          <option value="3:00 PM">3:00 PM</option>
+          <option value="4:00 PM">4:00 PM</option>
+          <option value="5:00 PM">5:00 PM</option>
+          <option value="6:00 PM">6:00 PM</option>
+          <option value="7:00 PM">7:00 PM</option>
+          <option value="8:00 PM">8:00 PM</option>
+          <option value="9:00 PM">9:00 PM</option>
+          <option value="10:00 PM">10:00 PM</option>
+          <option value="11:00 PM">11:00 PM</option>
+        </select>
+      </div>
+    </div>
+  </div>
+)}
+
               <div className="border-t border-zinc-200 pt-4">
   <p className="mb-3 text-sm font-black">
     Datos del pasajero
@@ -1447,6 +1752,14 @@ setCarryOnLuggage(0);
       onChange={(e) => setCustomerPhone(e.target.value)}
       className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none focus:border-red-500"
     />
+
+    <input
+  type="text"
+  placeholder="Número de vuelo (opcional)"
+  value={flightNumber}
+  onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
+  className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none focus:border-red-500"
+/>
 
     <input
       type="email"
@@ -1581,9 +1894,58 @@ setCarryOnLuggage(0);
 </div>
 
   {pickup && destination && passengers !== "13+" && (
-  <p className="mb-3 text-center text-xl font-black text-zinc-900">
-    Precio del traslado: US${finalPrice}
-  </p>
+  <div className="mb-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
+    <p className="text-center text-sm font-black uppercase tracking-[0.15em] text-red-600">
+      Resumen del viaje
+    </p>
+
+    <div className="mt-4 space-y-2 text-sm text-zinc-700">
+      <p>
+        <strong>Recogida:</strong> {pickup}
+      </p>
+
+      <p>
+        <strong>Destino:</strong> {destination}
+      </p>
+
+      <p>
+        <strong>Tipo de viaje:</strong>{" "}
+        {tripType === "roundtrip" ? "Ida y vuelta" : "Solo ida"}
+      </p>
+
+      <p>
+        <strong>Fecha de ida:</strong> {travelDate || "Pendiente"}
+      </p>
+
+      <p>
+        <strong>Hora de ida:</strong> {travelTime || "Pendiente"}
+      </p>
+
+      {tripType === "roundtrip" && (
+        <>
+          <p>
+            <strong>Fecha de regreso:</strong> {returnDate || "Pendiente"}
+          </p>
+
+          <p>
+            <strong>Hora de regreso:</strong> {returnTime || "Pendiente"}
+          </p>
+        </>
+      )}
+    </div>
+
+    <div className="mt-4 border-t border-zinc-200 pt-4 text-center">
+      <p className="text-sm font-bold text-zinc-500">
+        {tripType === "roundtrip"
+          ? "Precio total ida y vuelta"
+          : "Precio total del traslado"}
+      </p>
+
+      <p className="mt-1 text-3xl font-black text-zinc-950">
+        US${finalPrice}
+      </p>
+    </div>
+  </div>
 )}
 
 {passengers === "13+" && (
@@ -1627,6 +1989,21 @@ setCarryOnLuggage(0);
     alert("Por favor, completa todos los datos de la reserva.");
     return;
   }
+
+  if (tripType === "roundtrip" && (!returnDate || !returnTime)) {
+  alert("Selecciona la fecha y la hora de regreso.");
+  return;
+}
+
+if (
+  tripType === "roundtrip" &&
+  travelDate &&
+  returnDate &&
+  returnDate < travelDate
+) {
+  alert("La fecha de regreso no puede ser anterior a la fecha de ida.");
+  return;
+}
 
   if (pickup === destination) {
     alert("El punto de recogida y el destino no pueden ser iguales.");
@@ -1918,15 +2295,19 @@ setShowVehicles(true);
           vehicle: selectedVehicle,
           travelDate,
           travelTime,
+          tripType,
+returnDate,
+returnTime,
           paymentMethod: "card",
         };
 
        const { error } = await supabase.from("reservas").insert({
   reservation_code: reserva.reservationCode,
-  customer_name: reserva.customerName,
-  customer_phone: reserva.customerPhone,
-  customer_email: reserva.customerEmail,
-  pickup: reserva.pickup,
+customer_name: reserva.customerName,
+customer_phone: reserva.customerPhone,
+customer_email: reserva.customerEmail,
+flight_number: flightNumber.trim() || null,
+pickup: reserva.pickup,
   destination: reserva.destination,
   passengers: Number(reserva.passengers),
   large_luggage: largeLuggage,
@@ -1934,6 +2315,9 @@ carry_on_luggage: carryOnLuggage,
   vehicle: reserva.vehicle,
   travel_date: reserva.travelDate,
   travel_time: reserva.travelTime,
+  trip_type: reserva.tripType,
+return_date: reserva.tripType === "roundtrip" ? reserva.returnDate : null,
+return_time: reserva.tripType === "roundtrip" ? reserva.returnTime : null,
   amount: Number(reserva.amount),
   payment_method: reserva.paymentMethod,
   transaction_id: reserva.transactionId,
@@ -1950,8 +2334,12 @@ if (error) {
   name: customerName,
   phone: customerPhone,
   email: customerEmail,
+  flightNumber: flightNumber,
   date: travelDate,
   time: travelTime,
+  tripType: tripType,
+returnDate: returnDate,
+returnTime: returnTime,
   pickup: pickup,
   destination: destination,
   passengers: passengers,
@@ -1991,15 +2379,19 @@ if (error) {
         vehicle: selectedVehicle,
         travelDate,
         travelTime,
+        tripType,
+returnDate,
+returnTime,
         paymentMethod: "cash",
       };
 
       const { error } = await supabase.from("reservas").insert({
   reservation_code: reserva.reservationCode,
-  customer_name: reserva.customerName,
-  customer_phone: reserva.customerPhone,
-  customer_email: reserva.customerEmail,
-  pickup: reserva.pickup,
+customer_name: reserva.customerName,
+customer_phone: reserva.customerPhone,
+customer_email: reserva.customerEmail,
+flight_number: flightNumber.trim() || null,
+pickup: reserva.pickup,
   destination: reserva.destination,
   passengers: Number(reserva.passengers),
   large_luggage: largeLuggage,
@@ -2007,6 +2399,9 @@ carry_on_luggage: carryOnLuggage,
   vehicle: reserva.vehicle,
   travel_date: reserva.travelDate,
   travel_time: reserva.travelTime,
+  trip_type: reserva.tripType,
+return_date: reserva.tripType === "roundtrip" ? reserva.returnDate : null,
+return_time: reserva.tripType === "roundtrip" ? reserva.returnTime : null,
   amount: Number(reserva.amount),
   payment_method: reserva.paymentMethod,
   transaction_id: reserva.transactionId,
@@ -2023,8 +2418,12 @@ if (error) {
   name: customerName,
   phone: customerPhone,
   email: customerEmail,
+  flightNumber: flightNumber,
   date: travelDate,
   time: travelTime,
+  tripType: tripType,
+returnDate: returnDate,
+returnTime: returnTime,
   pickup: pickup,
   destination: destination,
   passengers: passengers,
@@ -2253,6 +2652,210 @@ if (error) {
           </div>
       </section>
 
+      {/* OPINIONES DE CLIENTES */}
+<section id="opiniones" className="bg-white py-24">
+  <div className="mx-auto max-w-7xl px-5 lg:px-8">
+
+    <div className="text-center">
+      <p className="font-black uppercase tracking-[0.25em] text-red-600">
+        Opiniones
+      </p>
+
+      <h2 className="mt-3 text-4xl font-black text-zinc-950 md:text-5xl">
+        Lo que dicen nuestros clientes
+      </h2>
+
+      <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-zinc-500">
+        Tu experiencia es importante para nosotros. Comparte tu opinión sobre
+        nuestro servicio.
+      </p>
+    </div>
+
+    {/* COMENTARIOS APROBADOS */}
+    <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {reviews.length > 0 ? (
+        reviews.map((review) => (
+          <div
+            key={review.id}
+            className="rounded-3xl border border-zinc-200 bg-zinc-50 p-7 shadow-sm"
+          >
+            <div className="flex gap-1 text-xl">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <span
+                  key={index}
+                  className={
+                    index < review.rating
+                      ? "text-yellow-500"
+                      : "text-zinc-300"
+                  }
+                >
+                  ★
+                </span>
+              ))}
+            </div>
+
+            <p className="mt-5 leading-7 text-zinc-600">
+              “{review.comment}”
+            </p>
+
+            <p className="mt-5 font-black text-zinc-950">
+              {review.name}
+            </p>
+          </div>
+        ))
+      ) : (
+        <div className="col-span-full rounded-3xl border border-zinc-200 bg-zinc-50 p-8 text-center">
+          <p className="font-bold text-zinc-600">
+            Sé el primero en compartir tu experiencia.
+          </p>
+        </div>
+      )}
+    </div>
+
+    {/* FORMULARIO PARA DEJAR OPINIÓN */}
+    <div className="mx-auto mt-14 max-w-2xl rounded-[2rem] border border-zinc-200 bg-white p-7 shadow-xl md:p-10">
+
+      <h3 className="text-center text-2xl font-black text-zinc-950">
+        Déjanos tu opinión
+      </h3>
+
+      <p className="mt-2 text-center text-sm text-zinc-500">
+        Cuéntanos cómo fue tu experiencia con VIP Tourist Transfer.
+      </p>
+
+      <div className="mt-7">
+        <label className="mb-2 block text-sm font-black text-zinc-800">
+          Nombre
+        </label>
+
+        <input
+          type="text"
+          value={reviewName}
+          onChange={(e) => setReviewName(e.target.value)}
+          placeholder="Tu nombre"
+          maxLength={80}
+          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+        />
+      </div>
+
+      <div className="mt-5">
+        <label className="mb-3 block text-sm font-black text-zinc-800">
+          Tu calificación
+        </label>
+
+        <div className="flex justify-center gap-2">
+          {Array.from({ length: 5 }).map((_, index) => {
+            const star = index + 1;
+
+            return (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setReviewRating(star)}
+                className={`text-4xl transition hover:scale-110 ${
+                  star <= reviewRating
+                    ? "text-yellow-500"
+                    : "text-zinc-300"
+                }`}
+                aria-label={`${star} estrellas`}
+              >
+                ★
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <label className="mb-2 block text-sm font-black text-zinc-800">
+          Comentario
+        </label>
+
+        <textarea
+          value={reviewComment}
+          onChange={(e) => setReviewComment(e.target.value)}
+          placeholder="Escribe aquí tu experiencia..."
+          maxLength={500}
+          rows={5}
+          className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+        />
+
+        <p className="mt-2 text-right text-xs font-semibold text-zinc-400">
+          {reviewComment.length}/500
+        </p>
+      </div>
+
+      {reviewMessage && (
+        <p className="mt-4 rounded-xl bg-zinc-100 p-4 text-center text-sm font-bold text-zinc-700">
+          {reviewMessage}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={handleReviewSubmit}
+        disabled={reviewSending}
+        className="mt-6 w-full rounded-xl bg-red-600 px-6 py-4 font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {reviewSending ? "Enviando..." : "Publicar opinión"}
+      </button>
+
+      <p className="mt-4 text-center text-xs leading-5 text-zinc-400">
+        Las opiniones son revisadas antes de publicarse.
+      </p>
+
+    </div>
+  </div>
+  </section>
+
+  {/* TRIPADVISOR */}
+<section className="bg-zinc-50 py-16">
+  <div className="mx-auto max-w-7xl px-5 lg:px-8">
+    <div className="overflow-hidden rounded-[2rem] border border-zinc-200 bg-white shadow-xl">
+      <div className="grid items-center gap-8 p-7 md:grid-cols-[1fr_auto] md:p-10">
+
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-[#00AA6C]">
+            Tripadvisor
+          </p>
+
+          <h2 className="mt-3 text-3xl font-black text-zinc-950 md:text-4xl">
+            También estamos en Tripadvisor
+          </h2>
+
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-2xl text-[#00AA6C]">
+              ● ● ● ● ●
+            </span>
+          </div>
+
+          <p className="mt-4 max-w-2xl leading-7 text-zinc-600">
+            Conoce nuestro perfil de VIP TOURIST TRANSFERS en Tripadvisor
+            y descubre más sobre nuestros servicios de transporte turístico
+            en República Dominicana.
+          </p>
+        </div>
+
+        <div className="md:text-right">
+          <a
+            href="https://www.tripadvisor.es/Attraction_Review-g147289-d33020734-Reviews-VIP_TOURIST_TRANSFERS-Santo_Domingo_Santo_Domingo_Province_Dominican_Republic.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center rounded-full bg-[#00AA6C] px-8 py-4 font-black text-white shadow-lg transition hover:scale-105 hover:bg-[#008f5b]"
+          >
+            Ver en Tripadvisor →
+          </a>
+
+          <p className="mt-3 text-center text-xs font-semibold text-zinc-400 md:text-right">
+            VIP TOURIST TRANSFERS
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
       {/* CONTACTO */}
       <section id="contacto" className="bg-red-600 py-20 text-white">
         <div className="mx-auto flex max-w-7xl flex-col justify-between gap-8 px-5 md:flex-row md:items-center lg:px-8">
@@ -2451,6 +3054,18 @@ if (error) {
   >
     <path d="M13.5 22v-9h3l.5-3.5h-3.5V7.3c0-1 .3-1.8 1.8-1.8H17V2.4c-.3 0-1.4-.1-2.7-.1-2.7 0-4.6 1.7-4.6 4.7v2.5H7V13h2.7v9h3.8z" />
   </svg>
+</a>
+
+{/* TRIPADVISOR */}
+<a
+  href="https://www.tripadvisor.es/Attraction_Review-g147289-d33020734-Reviews-VIP_TOURIST_TRANSFERS-Santo_Domingo_Santo_Domingo_Province_Dominican_Republic.html"
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Tripadvisor de VIP Tourist Transfer"
+  title="Tripadvisor"
+  className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00AA6C] text-white shadow-lg transition hover:scale-110 hover:bg-[#008f5b]"
+>
+  <span className="text-xl font-black">TA</span>
 </a>
 
         {/* WHATSAPP */}
