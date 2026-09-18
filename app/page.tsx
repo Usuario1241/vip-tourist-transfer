@@ -58,6 +58,7 @@ type Review = {
 };
 
 const [reviews, setReviews] = useState<Review[]>([]);
+const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 const [reviewName, setReviewName] = useState("");
 const [reviewRating, setReviewRating] = useState(5);
 const [reviewComment, setReviewComment] = useState("");
@@ -2263,30 +2264,7 @@ if (
   if (requiresCustomQuote) {
   setSelectedVehicle("");
   setPaymentMethod("");
-  setShowVehicles(false);
-
-  const whatsappMessage = encodeURIComponent(
-    `Hola, quiero solicitar una cotización personalizada con VIP Tourist Transfer.
-
-Recogida: ${pickup}
-Destino: ${destination}
-Pasajeros: ${passengers}
-Maletas grandes: ${largeLuggage}
-Equipaje de mano: ${carryOnLuggage}
-Fecha de ida: ${travelDate}
-Hora de ida: ${travelTime}
-Tipo de viaje: ${tripType === "roundtrip" ? "Ida y vuelta" : "Solo ida"}${
-      tripType === "roundtrip"
-        ? `\nFecha de regreso: ${returnDate}\nHora de regreso: ${returnTime}`
-        : ""
-    }`
-  );
-
-  window.open(
-    `https://wa.me/18296502013?text=${whatsappMessage}`,
-    "_blank"
-  );
-
+  setShowVehicles(true);
   return;
 }
 
@@ -2315,7 +2293,44 @@ setShowVehicles(true);
 
   </form>
 
-{showVehicles && (
+  {showVehicles && requiresCustomQuote && (
+  <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5 text-center shadow-sm">
+    <p className="text-xl font-black text-zinc-950">
+      Cotización personalizada
+    </p>
+
+    <p className="mt-2 text-sm leading-6 text-zinc-600">
+      Por la cantidad de pasajeros o equipaje, este traslado requiere una
+      cotización personalizada.
+    </p>
+
+    <a
+      href={`https://wa.me/18296502013?text=${encodeURIComponent(
+        `Hola, quiero solicitar una cotización personalizada con VIP Tourist Transfer.
+
+Recogida: ${pickup}
+Destino: ${destination}
+Pasajeros: ${passengers}
+Maletas grandes: ${largeLuggage}
+Equipaje de mano: ${carryOnLuggage}
+Fecha de ida: ${travelDate}
+Hora de ida: ${travelTime}
+Tipo de viaje: ${tripType === "roundtrip" ? "Ida y vuelta" : "Solo ida"}${
+          tripType === "roundtrip"
+            ? `\nFecha de regreso: ${returnDate}\nHora de regreso: ${returnTime}`
+            : ""
+        }`
+      )}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-4 flex w-full items-center justify-center rounded-xl bg-[#25D366] px-5 py-4 text-base font-black text-white transition hover:bg-[#20bd5a]"
+    >
+      Solicitar cotización por WhatsApp →
+    </a>
+  </div>
+)}
+
+{showVehicles && !requiresCustomQuote && (
   <div className="mt-6">
     <h3 className="mb-4 text-xl font-bold">
       Selecciona tu vehículo
@@ -2968,46 +2983,93 @@ returnTime: returnTime,
       </p>
     </div>
 
-    {/* COMENTARIOS APROBADOS */}
-    <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {reviews.length > 0 ? (
-        reviews.map((review) => (
-          <div
-            key={review.id}
-            className="rounded-3xl border border-zinc-200 bg-zinc-50 p-7 shadow-sm"
+    {/* CARRUSEL DE OPINIONES APROBADAS */}
+<div className="mx-auto mt-12 max-w-4xl">
+  {reviews.length > 0 ? (
+    <div className="relative overflow-hidden rounded-[2rem] border border-zinc-200 bg-zinc-50 px-6 py-10 shadow-sm md:px-16 md:py-14">
+
+      <div className="text-center">
+        <div className="flex justify-center gap-1 text-2xl">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <span
+              key={index}
+              className={
+                index < reviews[currentReviewIndex].rating
+                  ? "text-yellow-500"
+                  : "text-zinc-300"
+              }
+            >
+              ★
+            </span>
+          ))}
+        </div>
+
+        <p className="mx-auto mt-7 max-w-3xl text-xl font-semibold leading-9 text-zinc-700 md:text-2xl md:leading-10">
+          “{reviews[currentReviewIndex].comment}”
+        </p>
+
+        <p className="mt-7 text-lg font-black text-zinc-950">
+          {reviews[currentReviewIndex].name}
+        </p>
+      </div>
+
+      {reviews.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={() =>
+              setCurrentReviewIndex((current) =>
+                current === 0 ? reviews.length - 1 : current - 1
+              )
+            }
+            className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-2xl font-black text-zinc-900 shadow-md transition hover:bg-zinc-950 hover:text-white md:left-6"
+            aria-label="Opinión anterior"
           >
-            <div className="flex gap-1 text-xl">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <span
-                  key={index}
-                  className={
-                    index < review.rating
-                      ? "text-yellow-500"
-                      : "text-zinc-300"
-                  }
-                >
-                  ★
-                </span>
-              ))}
-            </div>
+            ‹
+          </button>
 
-            <p className="mt-5 leading-7 text-zinc-600">
-              “{review.comment}”
-            </p>
+          <button
+            type="button"
+            onClick={() =>
+              setCurrentReviewIndex((current) =>
+                current === reviews.length - 1 ? 0 : current + 1
+              )
+            }
+            className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-2xl font-black text-zinc-900 shadow-md transition hover:bg-zinc-950 hover:text-white md:right-6"
+            aria-label="Siguiente opinión"
+          >
+            ›
+          </button>
+        </>
+      )}
 
-            <p className="mt-5 font-black text-zinc-950">
-              {review.name}
-            </p>
-          </div>
-        ))
-      ) : (
-        <div className="col-span-full rounded-3xl border border-zinc-200 bg-zinc-50 p-8 text-center">
-          <p className="font-bold text-zinc-600">
-            Sé el primero en compartir tu experiencia.
-          </p>
+      {reviews.length > 1 && (
+        <div className="mt-8 flex justify-center gap-2">
+          {reviews.map((review, index) => (
+            <button
+              key={review.id}
+              type="button"
+              onClick={() => setCurrentReviewIndex(index)}
+              className={`h-2.5 rounded-full transition-all ${
+                index === currentReviewIndex
+                  ? "w-8 bg-red-600"
+                  : "w-2.5 bg-zinc-300"
+              }`}
+              aria-label={`Ver opinión ${index + 1}`}
+            />
+          ))}
         </div>
       )}
+
     </div>
+  ) : (
+    <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-8 text-center">
+      <p className="font-bold text-zinc-600">
+        Sé el primero en compartir tu experiencia.
+      </p>
+    </div>
+  )}
+</div>
 
     {/* FORMULARIO PARA DEJAR OPINIÓN */}
     <div className="mx-auto mt-14 max-w-2xl rounded-[2rem] border border-zinc-200 bg-white p-7 shadow-xl md:p-10">
