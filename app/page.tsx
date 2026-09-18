@@ -80,10 +80,10 @@ useEffect(() => {
 useEffect(() => {
   const calculateRoute = async () => {
     if (
-      !pickupPlace?.lat ||
-      !pickupPlace?.lng ||
-      !destinationPlace?.lat ||
-      !destinationPlace?.lng
+      typeof pickupPlace?.lat !== "number" ||
+      typeof pickupPlace?.lng !== "number" ||
+      typeof destinationPlace?.lat !== "number" ||
+      typeof destinationPlace?.lng !== "number"
     ) {
       setRouteDistance("");
       setRouteDuration("");
@@ -93,51 +93,39 @@ useEffect(() => {
     try {
       setRouteLoading(true);
 
-      const { Route } =
-        await window.google.maps.importLibrary("routes");
-
-      const response = await Route.computeRoutes({
-        origin: {
-          location: {
+      const response = await fetch("/api/route-info", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          origin: {
             lat: pickupPlace.lat,
             lng: pickupPlace.lng,
           },
-        },
-        destination: {
-          location: {
+          destination: {
             lat: destinationPlace.lat,
             lng: destinationPlace.lng,
           },
-        },
-        travelMode: "DRIVING",
-        routingPreference: "TRAFFIC_AWARE",
-        fields: ["distanceMeters", "durationMillis"],
+        }),
       });
 
-      const route = response.routes?.[0];
+      const data = await response.json();
 
-      if (!route) {
+      if (!response.ok || !data.ok) {
+        console.error("Error calculando la ruta:", data);
         setRouteDistance("");
         setRouteDuration("");
         return;
       }
 
-      const distanceKm =
-        typeof route.distanceMeters === "number"
-          ? route.distanceMeters / 1000
-          : 0;
-
-      const durationMinutes =
-        typeof route.durationMillis === "number"
-          ? Math.round(route.durationMillis / 60000)
-          : 0;
+      const distanceKm = Number(data.distanceKm) || 0;
+      const durationMinutes = Number(data.durationMinutes) || 0;
 
       const hours = Math.floor(durationMinutes / 60);
       const minutes = durationMinutes % 60;
 
-      setRouteDistance(
-        `${distanceKm.toFixed(1)} km`
-      );
+      setRouteDistance(`${distanceKm.toFixed(1)} km`);
 
       setRouteDuration(
         hours > 0
@@ -145,11 +133,7 @@ useEffect(() => {
           : `${minutes} min`
       );
     } catch (error) {
-      console.error(
-        "Error calculando la ruta:",
-        error
-      );
-
+      console.error("Error llamando /api/route-info:", error);
       setRouteDistance("");
       setRouteDuration("");
     } finally {
@@ -348,6 +332,82 @@ returnTime: string;
   paymentMethod: "card" | "cash";
 } | null>(null);
 
+// ============================================================
+// GESTIONAR / CANCELAR RESERVA
+// ============================================================
+
+const [manageReservationOpen, setManageReservationOpen] = useState(false);
+const [manageReservationCode, setManageReservationCode] = useState("");
+const [manageReservationEmail, setManageReservationEmail] = useState("");
+const [cancellationReason, setCancellationReason] = useState("");
+const [cancellationLoading, setCancellationLoading] = useState(false);
+const [cancellationMessage, setCancellationMessage] = useState("");
+const [cancellationSuccess, setCancellationSuccess] = useState(false);
+
+const handleCancelReservation = async () => {
+  const code = manageReservationCode.trim().toUpperCase();
+  const email = manageReservationEmail.trim().toLowerCase();
+  const reason = cancellationReason.trim();
+
+  setCancellationMessage("");
+
+  if (!code || !email) {
+    setCancellationMessage(
+      "Escribe el código de reserva y el correo electrónico."
+    );
+    return;
+  }
+
+  if (!reason) {
+    setCancellationMessage("Escribe el motivo de la cancelación.");
+    return;
+  }
+
+
+setCancellationLoading(true);
+
+try {
+  const response = await fetch("/api/cancel-reservation", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    code,
+    email,
+    reason,
+  }),
+});
+
+const result = await response.json();
+
+if (!response.ok || !result.ok) {
+  setCancellationMessage(
+    result.message || "No se pudo cancelar la reserva."
+  );
+  return;
+}
+
+setCancellationMessage(
+  result.message || "Reserva cancelada correctamente."
+);
+
+setCancellationSuccess(true);
+
+setManageReservationCode("");
+setManageReservationEmail("");
+setCancellationReason("");
+
+  } catch (error) {
+    console.error("Error cancelando reserva:", error);
+    setCancellationMessage(
+      "Ocurrió un error al cancelar la reserva. Inténtalo nuevamente."
+    );
+  } finally {
+    setCancellationLoading(false);
+  }
+};
+
 useEffect(() => {
   // Cuando se abre o recarga la página, empezar arriba.
   if ("scrollRestoration" in window.history) {
@@ -436,6 +496,7 @@ const tariffPrices: Record<string, VehiclePrice> = {
   "Las Galeras": { sedan: 220, suv: 280, van: 340 },
   "Las Terrenas": { sedan: 190, suv: 210, van: 320 },
   "Macao": { sedan: 155, suv: 180, van: 290 },
+  "Miches": { sedan: 175, suv: 200, van: 300 },
   "Nagua": { sedan: 160, suv: 200, van: 280 },
   "Palmar de Ocoa": { sedan: 160, suv: 200, van: 270 },
   "Pedernales (Dominican Republic)": { sedan: 320, suv: 410, van: 510 },
@@ -552,6 +613,7 @@ const destinationAliases: Record<string, string[]> = {
   "Las Galeras": ["las galeras"],
   "Las Terrenas": ["las terrenas"],
   "Macao": ["macao"],
+  "Miches": ["miches"],
   "Nagua": ["nagua"],
   "Palmar de Ocoa": ["palmar de ocoa"],
   "Pedernales (Dominican Republic)": ["pedernales"],
@@ -644,18 +706,49 @@ const matchingTariff = Object.entries(destinationAliases)
   .sort((a, b) => b.alias.length - a.alias.length)[0];
 
 const passengerNumber = parseInt(passengers, 10) || 0;
+const totalLuggage = largeLuggage + carryOnLuggage;
+
+// Capacidad máxima de cada vehículo.
+const vehicleCapacity = {
+  sedan: {
+    passengers: 3,
+    largeLuggage: 2,
+    carryOnLuggage: 2,
+    totalLuggage: 3,
+  },
+  suv: {
+    passengers: 6,
+    largeLuggage: 5,
+    carryOnLuggage: 5,
+    totalLuggage: 6,
+  },
+  van: {
+    passengers: 12,
+    largeLuggage: 10,
+    carryOnLuggage: 10,
+    totalLuggage: 12,
+  },
+} as const;
 
 const sedanFits =
-  passengerNumber <= 3 &&
-  largeLuggage <= 2 &&
-  carryOnLuggage <= 2 &&
-  largeLuggage + carryOnLuggage <= 3;
+  passengerNumber <= vehicleCapacity.sedan.passengers &&
+  largeLuggage <= vehicleCapacity.sedan.largeLuggage &&
+  carryOnLuggage <= vehicleCapacity.sedan.carryOnLuggage &&
+  totalLuggage <= vehicleCapacity.sedan.totalLuggage;
 
 const minivanFits =
-  passengerNumber <= 6 &&
-  largeLuggage <= 5 &&
-  carryOnLuggage <= 5 &&
-  largeLuggage + carryOnLuggage <= 6;
+  passengerNumber <= vehicleCapacity.suv.passengers &&
+  largeLuggage <= vehicleCapacity.suv.largeLuggage &&
+  carryOnLuggage <= vehicleCapacity.suv.carryOnLuggage &&
+  totalLuggage <= vehicleCapacity.suv.totalLuggage;
+
+const vanFits =
+  passengerNumber <= vehicleCapacity.van.passengers &&
+  largeLuggage <= vehicleCapacity.van.largeLuggage &&
+  carryOnLuggage <= vehicleCapacity.van.carryOnLuggage &&
+  totalLuggage <= vehicleCapacity.van.totalLuggage;
+
+const requiresCustomQuote = !vanFits;
 
 const pricingVehicle: "sedan" | "suv" | "van" =
   selectedVehicle === "sedan" ||
@@ -669,11 +762,18 @@ const pricingVehicle: "sedan" | "suv" | "van" =
     : "van";
 
 // ============================================================
-// MOTOR DE PRECIOS VIP TOURIST TRANSFER
-// 1. Rutas desde SDQ incluidas en el tarifario = precio oficial.
-// 2. Otras rutas = cálculo por distancia real de Google Maps.
-// 3. Nunca usar un precio genérico de US$75 para rutas largas.
-// 4. Al final se aplica el 6%.
+// MOTOR DE PRECIOS VIP TOURIST TRANSFER - DEFINITIVO
+// ============================================================
+//
+// PRIORIDAD:
+// 1. Si la ruta SDQ <-> destino aparece en el tarifario,
+//    utiliza EXACTAMENTE el precio oficial.
+// 2. Si el lugar no aparece (Miches, hotel, resort, municipio,
+//    playa, aeropuerto, etc.), utiliza la distancia real de Google.
+// 3. Funciona en ambos sentidos: SDQ -> destino / destino -> SDQ.
+// 4. Nunca permite US$0.00.
+// 5. Ida y vuelta = ida x 2.
+// 6. Al precio se aplica el 6% adicional.
 // ============================================================
 
 const distanceKm = (() => {
@@ -688,100 +788,76 @@ const distanceKm = (() => {
   return Number.isFinite(parsed) ? parsed : 0;
 })();
 
-
-// ------------------------------------------------------------
-// TARIFA OFICIAL CUANDO LA RECOGIDA ES SDQ
-// ------------------------------------------------------------
+// ============================================================
+// 1. BUSCAR TARIFA OFICIAL
+// ============================================================
 
 const exactTariffPrice =
   (isSdqPickup || isSdqDestination) && matchingTariff
-    ? tariffPrices[matchingTariff.tariffName][pricingVehicle]
+    ? tariffPrices[matchingTariff.tariffName]?.[pricingVehicle] ?? null
     : null;
 
-
-// ------------------------------------------------------------
-// PRECIO POR DISTANCIA
-// Se utiliza cuando la ruta NO está cubierta directamente
-// por el tarifario oficial desde SDQ.
-// ------------------------------------------------------------
+// ============================================================
+// 2. PRECIO AUTOMÁTICO POR DISTANCIA
+// ============================================================
 
 const calculateDistancePrice = (
   km: number,
   vehicle: "sedan" | "suv" | "van"
-) => {
-  if (km <= 0) {
-    return 0;
+): number | null => {
+  if (!Number.isFinite(km) || km <= 0) {
+    return null;
   }
 
   let sedanPrice = 0;
 
-  // RUTAS CORTAS
-  if (km <= 20) {
+  // Tarifas base construidas para mantener una progresión
+  // compatible con el tarifario de VIP Tourist Transfer.
+
+  if (km <= 15) {
     sedanPrice = 45;
-  }
-
-  // 21 - 40 KM
-  else if (km <= 40) {
+  } else if (km <= 30) {
     sedanPrice = 60;
-  }
-
-  // 41 - 70 KM
-  else if (km <= 70) {
-    sedanPrice = 85;
-  }
-
-  // 71 - 100 KM
-  else if (km <= 100) {
+  } else if (km <= 50) {
+    sedanPrice = 75;
+  } else if (km <= 75) {
+    sedanPrice = 95;
+  } else if (km <= 100) {
     sedanPrice = 115;
-  }
-
-  // 101 - 140 KM
-  else if (km <= 140) {
-    sedanPrice = 145;
-  }
-
-  // 141 - 180 KM
-  else if (km <= 180) {
+  } else if (km <= 125) {
+    sedanPrice = 135;
+  } else if (km <= 150) {
+    sedanPrice = 155;
+  } else if (km <= 175) {
     sedanPrice = 175;
+  } else if (km <= 200) {
+    sedanPrice = 190;
+  } else if (km <= 225) {
+    sedanPrice = 210;
+  } else if (km <= 250) {
+    sedanPrice = 230;
+  } else if (km <= 275) {
+    sedanPrice = 250;
+  } else if (km <= 300) {
+    sedanPrice = 270;
+  } else if (km <= 325) {
+    sedanPrice = 290;
+  } else if (km <= 350) {
+    sedanPrice = 310;
+  } else if (km <= 375) {
+    sedanPrice = 330;
+  } else if (km <= 400) {
+    sedanPrice = 350;
+  } else {
+    // Más de 400 km:
+    // sumar US$20 por cada 25 km adicionales.
+    sedanPrice =
+      350 + Math.ceil((km - 400) / 25) * 20;
   }
 
-  // 181 - 220 KM
-  else if (km <= 220) {
-    sedanPrice = 205;
-  }
-
-  // 221 - 260 KM
-  else if (km <= 260) {
-    sedanPrice = 235;
-  }
-
-  // 261 - 300 KM
-  else if (km <= 300) {
-    sedanPrice = 265;
-  }
-
-  // 301 - 350 KM
-  else if (km <= 350) {
-    sedanPrice = 300;
-  }
-
-  // 351 - 400 KM
-  else if (km <= 400) {
-    sedanPrice = 340;
-  }
-
-  // MÁS DE 400 KM
-  else {
-    sedanPrice = 340 + Math.ceil((km - 400) / 25) * 20;
-  }
-
-
-  // ----------------------------------------------------------
-  // AJUSTE SEGÚN VEHÍCULO
-  // ----------------------------------------------------------
-
+  // Diferencia de precio por categoría.
   if (vehicle === "suv") {
-    return Math.round(sedanPrice * 1.20);
+    return Math.round(sedanPrice * 1.2);
   }
 
   if (vehicle === "van") {
@@ -791,65 +867,113 @@ const calculateDistancePrice = (
   return sedanPrice;
 };
 
-
-// ------------------------------------------------------------
-// PRECIO CALCULADO DE LA RUTA
-// ------------------------------------------------------------
+// ============================================================
+// 3. PRECIO SEGÚN DISTANCIA REAL DE GOOGLE
+// ============================================================
 
 const distanceBasedPrice =
   distanceKm > 0
     ? calculateDistancePrice(distanceKm, pricingVehicle)
-    : 0;
+    : null;
 
-
-// ------------------------------------------------------------
-// PRIORIDAD DEL MOTOR
+// ============================================================
+// 4. ELEGIR PRECIO
 //
-// 1. Si existe precio oficial SDQ → destino, usar tarifario.
-// 2. Si no existe, usar distancia real.
-// 3. Si Google todavía está calculando, precio = 0.
-// ------------------------------------------------------------
+// Si existe en el tarifario:
+//      PRECIO OFICIAL.
+//
+// Si NO existe:
+//      PRECIO POR DISTANCIA.
+//
+// Esto permite Miches, hoteles, resorts, playas, municipios,
+// aeropuertos y demás lugares encontrados por Google.
+// ============================================================
 
-const calculatedPrice =
-  exactTariffPrice !== null
+const calculatedPrice: number | null =
+  exactTariffPrice !== null && exactTariffPrice > 0
     ? exactTariffPrice
     : distanceBasedPrice;
 
+// ============================================================
+// 5. IDA / IDA Y VUELTA
+// ============================================================
 
-// ------------------------------------------------------------
-// 6% ADICIONAL
-// ------------------------------------------------------------
+const priceWithVehicles =
+  !requiresCustomQuote &&
+  calculatedPrice !== null &&
+  calculatedPrice > 0
+    ? calculatedPrice
+    : null;
 
 const tripPrice =
-  tripType === "roundtrip"
-    ? calculatedPrice * 2
-    : calculatedPrice;
+  priceWithVehicles !== null && priceWithVehicles > 0
+    ? tripType === "roundtrip"
+      ? priceWithVehicles * 2
+      : priceWithVehicles
+    : null;
+
+// ============================================================
+// 6. APLICAR 6%
+// ============================================================
 
 const finalPrice =
-  tripPrice > 0
+  tripPrice !== null && tripPrice > 0
     ? (tripPrice * 1.06).toFixed(2)
-    : "0.00";
+    : "";
+
+// ============================================================
+// 7. SEGURIDAD
+// ============================================================
+
+const priceReady =
+  finalPrice !== "" &&
+  Number.isFinite(Number(finalPrice)) &&
+  Number(finalPrice) > 0;
+
+// Mientras Google está buscando la ruta.
+const priceIsCalculating =
+  Boolean(pickup && destination) &&
+  !priceReady &&
+  routeLoading;
+
+// Solo mostrar "Tarifa no disponible" si Google terminó
+// y realmente no pudo obtener una ruta/distancia válida.
+const priceUnavailable =
+  Boolean(pickup && destination) &&
+  !priceReady &&
+  !routeLoading &&
+  distanceKm <= 0;
 
 const passengerCount = parseInt(passengers, 10) || 0;
 
-// CAPACIDAD DE PASAJEROS + EQUIPAJE
+// ============================================================
+// CAPACIDAD REAL DE LOS VEHÍCULOS
+// ============================================================
+
+// Sedán: máximo 3 pasajeros.
+// Máximo 2 maletas grandes, 2 de mano y 3 piezas en total.
 const sedanUnavailable =
   passengerCount > 3 ||
   largeLuggage > 2 ||
   carryOnLuggage > 2 ||
   largeLuggage + carryOnLuggage > 3;
 
+// Minivan: máximo 6 pasajeros.
+// Máximo 5 maletas grandes, 5 de mano y 6 piezas en total.
 const minivanUnavailable =
   passengerCount > 6 ||
   largeLuggage > 5 ||
   carryOnLuggage > 5 ||
   largeLuggage + carryOnLuggage > 6;
 
+// Van: máximo 12 pasajeros.
+// Máximo 10 maletas grandes, 10 de mano y 12 piezas en total.
 const vanUnavailable =
   passengerCount > 12 ||
   largeLuggage > 10 ||
   carryOnLuggage > 10 ||
   largeLuggage + carryOnLuggage > 12;
+
 
  const locations = [
   { name: "Aeropuerto SDQ", subtitle: "Aeropuerto Internacional Las Américas" },
@@ -1299,6 +1423,120 @@ const vanUnavailable =
   </div>
 )}
 
+{/* MODAL GESTIONAR / CANCELAR RESERVA */}
+{manageReservationOpen && (
+  <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+    <div className="relative w-full max-w-lg rounded-3xl bg-white p-7 shadow-2xl md:p-9">
+
+      <button
+        type="button"
+        onClick={() => {
+  setManageReservationOpen(false);
+  setCancellationMessage("");
+  setCancellationSuccess(false);
+  setManageReservationCode("");
+  setManageReservationEmail("");
+  setCancellationReason("");
+}}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-xl font-black text-zinc-700 transition hover:bg-red-600 hover:text-white"
+        aria-label="Cerrar"
+      >
+        ×
+      </button>
+
+      <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">
+        VIP Tourist Transfer
+      </p>
+
+      <h2 className="mt-3 text-3xl font-black text-zinc-950">
+        Gestionar reserva
+      </h2>
+
+      <p className="mt-2 text-sm leading-6 text-zinc-500">
+        Introduce los datos utilizados al realizar tu reservación.
+      </p>
+
+      <div className="mt-7 space-y-4">
+        <input
+          type="text"
+          placeholder="Código de reserva (Ej: VIP-123456)"
+          value={manageReservationCode}
+          onChange={(e) =>
+            setManageReservationCode(e.target.value.toUpperCase())
+          }
+          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+        />
+
+        <input
+          type="email"
+          placeholder="Correo electrónico de la reserva"
+          value={manageReservationEmail}
+          onChange={(e) => setManageReservationEmail(e.target.value)}
+          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+        />
+
+        <textarea
+          placeholder="Motivo de la cancelación"
+          value={cancellationReason}
+          onChange={(e) => setCancellationReason(e.target.value)}
+          rows={4}
+          className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 outline-none transition focus:border-red-500"
+        />
+
+        {cancellationMessage && (
+  <div
+    className={`rounded-xl border p-4 text-center font-bold ${
+      cancellationSuccess
+        ? "border-green-200 bg-green-50 text-green-700"
+        : "border-red-200 bg-red-50 text-red-700"
+    }`}
+  >
+    {cancellationSuccess && (
+      <div className="mb-2 text-4xl">✅</div>
+    )}
+
+    <p>
+      {cancellationSuccess
+        ? "Reserva cancelada correctamente"
+        : cancellationMessage}
+    </p>
+  </div>
+)}
+
+        {!cancellationSuccess ? (
+  <button
+    type="button"
+    onClick={handleCancelReservation}
+    disabled={cancellationLoading}
+    className="w-full rounded-xl bg-red-600 px-6 py-4 font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    {cancellationLoading
+      ? "Procesando cancelación..."
+      : "Cancelar mi reserva"}
+  </button>
+) : (
+  <button
+    type="button"
+    onClick={() => {
+      setManageReservationOpen(false);
+      setCancellationMessage("");
+      setCancellationSuccess(false);
+    }}
+    className="w-full rounded-xl bg-zinc-950 px-6 py-4 font-black text-white transition hover:bg-zinc-800"
+  >
+    Cerrar
+  </button>
+)}
+
+        <p className="text-center text-xs leading-5 text-zinc-500">
+          Las solicitudes de reembolso de pagos realizados con tarjeta o
+          PayPal serán revisadas según la política de cancelación.
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
       {/* HERO */}
       <section
         id="inicio"
@@ -1395,6 +1633,17 @@ const vanUnavailable =
             <p className="mt-2 text-center text-zinc-500">
               Completa los datos de tu viaje.
             </p>
+
+            <button
+  type="button"
+  onClick={() => {
+    setManageReservationOpen(true);
+    setCancellationMessage("");
+  }}
+  className="mt-5 w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-5 py-3 text-sm font-black text-zinc-700 transition hover:border-red-600 hover:bg-red-50 hover:text-red-600"
+>
+  Gestionar / Cancelar una reserva
+</button>
 
             {confirmedReservation ? (
   <div className="mt-7 rounded-3xl border border-green-200 bg-green-50 p-6 text-center">
@@ -1934,42 +2183,43 @@ setReturnTime("");
       )}
     </div>
 
-    <div className="mt-4 border-t border-zinc-200 pt-4 text-center">
-      <p className="text-sm font-bold text-zinc-500">
-        {tripType === "roundtrip"
-          ? "Precio total ida y vuelta"
-          : "Precio total del traslado"}
-      </p>
+    {!requiresCustomQuote && passengers !== "13+" && (
+  <div className="mt-4 border-t border-zinc-200 pt-4 text-center">
+    <p className="text-sm font-bold text-zinc-500">
+      {tripType === "roundtrip"
+        ? "Precio total ida y vuelta"
+        : "Precio total del traslado"}
+    </p>
 
+    {priceReady ? (
       <p className="mt-1 text-3xl font-black text-zinc-950">
         US${finalPrice}
       </p>
-    </div>
+    ) : priceIsCalculating ? (
+      <div className="mt-2">
+        <p className="text-lg font-black text-zinc-700">
+          Calculando tarifa...
+        </p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Estamos verificando la distancia de tu traslado.
+        </p>
+      </div>
+    ) : (
+      <div className="mt-2">
+        <p className="text-lg font-black text-red-600">
+          Tarifa no disponible automáticamente
+        </p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Selecciona el punto de recogida y el destino desde las sugerencias de búsqueda.
+        </p>
+      </div>
+    )}
   </div>
 )}
 
-{passengers === "13+" && (
-  <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-center shadow-sm">
-    <p className="text-lg font-black text-red-700">
-      Cotización personalizada
-    </p>
-
-    <p className="mt-2 text-sm leading-6 text-zinc-600">
-      Para grupos de 13 pasajeros o más, preparamos una solución de transporte personalizada según el tamaño de tu grupo.
-    </p>
-
-    <a
-      href={`https://wa.me/18296502013?text=${encodeURIComponent(
-        `Hola, quiero solicitar una cotización para un grupo de 13 o más pasajeros con VIP Tourist Transfer. Recogida: ${pickup}. Destino: ${destination}. Maletas grandes: ${largeLuggage}. Equipaje de mano: ${carryOnLuggage}.`
-      )}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-[#25D366] px-5 py-3 font-black text-white transition hover:scale-[1.02] hover:bg-[#20bd5a]"
-    >
-      Solicitar cotización por WhatsApp →
-    </a>
   </div>
 )}
+
 
 <button
   type="button"
@@ -2010,10 +2260,47 @@ if (
     return;
   }
 
-  if (passengers === "13+") {
-  alert(
-    "Para grupos de 13 pasajeros o más, contáctanos para una cotización personalizada."
+  if (requiresCustomQuote) {
+  setSelectedVehicle("");
+  setPaymentMethod("");
+  setShowVehicles(false);
+
+  const whatsappMessage = encodeURIComponent(
+    `Hola, quiero solicitar una cotización personalizada con VIP Tourist Transfer.
+
+Recogida: ${pickup}
+Destino: ${destination}
+Pasajeros: ${passengers}
+Maletas grandes: ${largeLuggage}
+Equipaje de mano: ${carryOnLuggage}
+Fecha de ida: ${travelDate}
+Hora de ida: ${travelTime}
+Tipo de viaje: ${tripType === "roundtrip" ? "Ida y vuelta" : "Solo ida"}${
+      tripType === "roundtrip"
+        ? `\nFecha de regreso: ${returnDate}\nHora de regreso: ${returnTime}`
+        : ""
+    }`
   );
+
+  window.open(
+    `https://wa.me/18296502013?text=${whatsappMessage}`,
+    "_blank"
+  );
+
+  return;
+}
+
+if (!priceReady) {
+  if (routeLoading) {
+    alert(
+      "Estamos calculando la tarifa de esta ruta. Espera unos segundos e inténtalo nuevamente."
+    );
+  } else {
+    alert(
+      "No pudimos calcular automáticamente la tarifa de esta ruta. Solicita una cotización por WhatsApp."
+    );
+  }
+
   return;
 }
 
@@ -2220,9 +2507,19 @@ setShowVehicles(true);
           : "Van Ejecutiva"}
       </p>
 
-      <p className="pt-2 text-lg font-black">
-        Total: US${finalPrice}
-      </p>
+      {priceReady ? (
+  <p className="pt-2 text-lg font-black">
+    Total: US${finalPrice}
+  </p>
+) : priceIsCalculating ? (
+  <p className="pt-2 text-lg font-black text-zinc-600">
+    Calculando tarifa...
+  </p>
+) : (
+  <p className="pt-2 text-lg font-black text-red-600">
+    Tarifa pendiente de cotización
+  </p>
+)}
     </div>
   </div>
 )}
@@ -2277,7 +2574,7 @@ setShowVehicles(true);
   </div>
 )}
 
-  {selectedVehicle && paymentMethod === "card" && (
+  {selectedVehicle && paymentMethod === "card" && priceReady && (
   <div className="mt-5">
     <PayPalPayment
       amount={finalPrice}
@@ -2360,7 +2657,7 @@ returnTime: returnTime,
   </div>
 )}
 
-{selectedVehicle && paymentMethod === "cash" && (
+{selectedVehicle && paymentMethod === "cash" && priceReady && (
   <button
     type="button"
     onClick={async () => {

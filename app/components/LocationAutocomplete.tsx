@@ -99,7 +99,9 @@ export default function LocationAutocomplete({
 
   // CERRAR RESULTADOS AL HACER CLIC FUERA
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+    const handleClickOutside = (
+      event: MouseEvent | TouchEvent
+    ) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
@@ -112,11 +114,18 @@ export default function LocationAutocomplete({
     document.addEventListener("touchstart", handleClickOutside);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      );
+      document.removeEventListener(
+        "touchstart",
+        handleClickOutside
+      );
     };
   }, []);
 
+  // INICIALIZAR GOOGLE PLACES
   useEffect(() => {
     let cancelled = false;
 
@@ -161,6 +170,7 @@ export default function LocationAutocomplete({
     };
   }, []);
 
+  // BUSCAR UBICACIONES
   const searchPlaces = async (text: string) => {
     setInputValue(text);
 
@@ -208,6 +218,7 @@ export default function LocationAutocomplete({
     }
   };
 
+  // SELECCIONAR UBICACIÓN
   const selectPlace = async (suggestion: any) => {
     try {
       const prediction =
@@ -227,10 +238,37 @@ export default function LocationAutocomplete({
       });
 
       const label =
-  prediction.text?.toString() ||
-  place.formattedAddress ||
-  place.displayName ||
-  "";
+        prediction.text?.toString() ||
+        place.formattedAddress ||
+        place.displayName?.toString() ||
+        "";
+
+      const lat =
+        typeof place.location?.lat === "function"
+          ? place.location.lat()
+          : place.location?.lat;
+
+      const lng =
+        typeof place.location?.lng === "function"
+          ? place.location.lng()
+          : place.location?.lng;
+
+      if (
+        !Number.isFinite(Number(lat)) ||
+        !Number.isFinite(Number(lng))
+      ) {
+        console.error(
+          "La ubicación seleccionada no devolvió coordenadas:",
+          {
+            label,
+            placeId: place.id,
+            location: place.location,
+          }
+        );
+
+        setSuggestions([]);
+        return;
+      }
 
       setInputValue(label);
       setSuggestions([]);
@@ -238,14 +276,12 @@ export default function LocationAutocomplete({
       onSelect({
         label,
         placeId: place.id,
-        lat: place.location?.lat(),
-        lng: place.location?.lng(),
+        lat: Number(lat),
+        lng: Number(lng),
       });
 
       const placesLibrary =
-        await window.google.maps.importLibrary(
-          "places"
-        );
+        await window.google.maps.importLibrary("places");
 
       sessionTokenRef.current =
         new placesLibrary.AutocompleteSessionToken();
@@ -269,18 +305,14 @@ export default function LocationAutocomplete({
           searchPlaces(e.target.value)
         }
         placeholder={placeholder}
-
         autoComplete="new-password"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-
         data-lpignore="true"
         data-form-type="other"
-
         name={`location-${placeholder}`}
         aria-autocomplete="list"
-
         className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 pr-10 text-gray-900 outline-none transition focus:border-black focus:ring-2 focus:ring-black/10"
       />
 
