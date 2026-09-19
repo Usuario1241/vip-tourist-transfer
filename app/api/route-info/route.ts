@@ -113,14 +113,19 @@ export async function POST(request: NextRequest) {
 
     const durationMinutes = Math.ceil(durationSeconds / 60);
 
-    return NextResponse.json({
-      ok: true,
-      distanceMeters,
-      distanceKm: Number(distanceKm.toFixed(2)),
-      durationSeconds,
-      durationMinutes,
-      encodedPolyline: route.polyline?.encodedPolyline ?? null,
-    });
+console.log("RUTA GOOGLE OK:", {
+  distanceKm: Number(distanceKm.toFixed(2)),
+  durationMinutes,
+});
+
+return NextResponse.json({
+  ok: true,
+  distanceMeters,
+  distanceKm: Number(distanceKm.toFixed(2)),
+  durationSeconds,
+  durationMinutes,
+  encodedPolyline: route.polyline?.encodedPolyline ?? null,
+});
   } catch (error) {
     console.error("Error en /api/route-info:", error);
 

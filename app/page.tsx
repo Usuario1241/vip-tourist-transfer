@@ -121,12 +121,12 @@ useEffect(() => {
       }
 
       const distanceKm = Number(data.distanceKm) || 0;
-      const durationMinutes = Number(data.durationMinutes) || 0;
+const durationMinutes = Number(data.durationMinutes) || 0;
 
-      const hours = Math.floor(durationMinutes / 60);
-      const minutes = durationMinutes % 60;
+const hours = Math.floor(durationMinutes / 60);
+const minutes = durationMinutes % 60;
 
-      setRouteDistance(`${distanceKm.toFixed(1)} km`);
+setRouteDistance(`${distanceKm.toFixed(1)} km`);
 
       setRouteDuration(
         hours > 0
@@ -936,6 +936,7 @@ const priceUnavailable =
   !priceReady &&
   !routeLoading &&
   distanceKm <= 0;
+
 const passengerCount = parseInt(passengers, 10) || 0;
 
 // ============================================================
