@@ -763,18 +763,8 @@ const pricingVehicle: "sedan" | "suv" | "van" =
     : "van";
 
 // ============================================================
-// MOTOR DE PRECIOS VIP TOURIST TRANSFER - DEFINITIVO
-// ============================================================
-//
-// PRIORIDAD:
-// 1. Si la ruta SDQ <-> destino aparece en el tarifario,
-//    utiliza EXACTAMENTE el precio oficial.
-// 2. Si el lugar no aparece (Miches, hotel, resort, municipio,
-//    playa, aeropuerto, etc.), utiliza la distancia real de Google.
-// 3. Funciona en ambos sentidos: SDQ -> destino / destino -> SDQ.
-// 4. Nunca permite US$0.00.
-// 5. Ida y vuelta = ida x 2.
-// 6. Al precio se aplica el 6% adicional.
+// MOTOR NACIONAL DE PRECIOS - VIP TOURIST TRANSFER
+// República Dominicana completa
 // ============================================================
 
 const distanceKm = (() => {
@@ -790,7 +780,9 @@ const distanceKm = (() => {
 })();
 
 // ============================================================
-// 1. BUSCAR TARIFA OFICIAL
+// 1. TARIFA OFICIAL DEL DUEÑO
+// Se conserva cuando el viaje conecta con SDQ y existe
+// una tarifa específica en el tarifario.
 // ============================================================
 
 const exactTariffPrice =
@@ -799,10 +791,11 @@ const exactTariffPrice =
     : null;
 
 // ============================================================
-// 2. PRECIO AUTOMÁTICO POR DISTANCIA
+// 2. MOTOR AUTOMÁTICO NACIONAL
+// Para cualquier ruta válida dentro de RD.
 // ============================================================
 
-const calculateDistancePrice = (
+const calculateNationalPrice = (
   km: number,
   vehicle: "sedan" | "suv" | "van"
 ): number | null => {
@@ -810,14 +803,17 @@ const calculateDistancePrice = (
     return null;
   }
 
-  let sedanPrice = 0;
+  let sedanPrice: number;
 
-  // Tarifas base construidas para mantener una progresión
-  // compatible con el tarifario de VIP Tourist Transfer.
+  // Precio base progresivo según distancia real por carretera.
+  // Los tramos están calibrados alrededor del tarifario
+  // comercial existente de VIP Tourist Transfer.
 
-  if (km <= 15) {
-    sedanPrice = 45;
-  } else if (km <= 30) {
+  if (km <= 10) {
+    sedanPrice = 40;
+  } else if (km <= 20) {
+    sedanPrice = 50;
+  } else if (km <= 35) {
     sedanPrice = 60;
   } else if (km <= 50) {
     sedanPrice = 75;
@@ -850,13 +846,11 @@ const calculateDistancePrice = (
   } else if (km <= 400) {
     sedanPrice = 350;
   } else {
-    // Más de 400 km:
-    // sumar US$20 por cada 25 km adicionales.
     sedanPrice =
       350 + Math.ceil((km - 400) / 25) * 20;
   }
 
-  // Diferencia de precio por categoría.
+  // Ajuste por categoría del vehículo.
   if (vehicle === "suv") {
     return Math.round(sedanPrice * 1.2);
   }
@@ -869,34 +863,31 @@ const calculateDistancePrice = (
 };
 
 // ============================================================
-// 3. PRECIO SEGÚN DISTANCIA REAL DE GOOGLE
+// 3. CALCULAR PRECIO POR LA RUTA REAL
 // ============================================================
 
-const distanceBasedPrice =
+const nationalDistancePrice =
   distanceKm > 0
-    ? calculateDistancePrice(distanceKm, pricingVehicle)
+    ? calculateNationalPrice(distanceKm, pricingVehicle)
     : null;
 
 // ============================================================
-// 4. ELEGIR PRECIO
+// 4. DECIDIR QUÉ TARIFA UTILIZAR
 //
-// Si existe en el tarifario:
-//      PRECIO OFICIAL.
+// Ruta oficial SDQ <-> destino conocido:
+// usa el tarifario.
 //
-// Si NO existe:
-//      PRECIO POR DISTANCIA.
-//
-// Esto permite Miches, hoteles, resorts, playas, municipios,
-// aeropuertos y demás lugares encontrados por Google.
+// Cualquier otra combinación:
+// usa distancia real.
 // ============================================================
 
 const calculatedPrice: number | null =
   exactTariffPrice !== null && exactTariffPrice > 0
     ? exactTariffPrice
-    : distanceBasedPrice;
+    : nationalDistancePrice;
 
 // ============================================================
-// 5. IDA / IDA Y VUELTA
+// 5. VALIDAR CAPACIDAD
 // ============================================================
 
 const priceWithVehicles =
@@ -906,6 +897,10 @@ const priceWithVehicles =
     ? calculatedPrice
     : null;
 
+// ============================================================
+// 6. IDA / IDA Y VUELTA
+// ============================================================
+
 const tripPrice =
   priceWithVehicles !== null && priceWithVehicles > 0
     ? tripType === "roundtrip"
@@ -914,7 +909,7 @@ const tripPrice =
     : null;
 
 // ============================================================
-// 6. APLICAR 6%
+// 7. APLICAR 6%
 // ============================================================
 
 const finalPrice =
@@ -923,7 +918,7 @@ const finalPrice =
     : "";
 
 // ============================================================
-// 7. SEGURIDAD
+// 8. ESTADO DEL PRECIO
 // ============================================================
 
 const priceReady =
@@ -931,20 +926,16 @@ const priceReady =
   Number.isFinite(Number(finalPrice)) &&
   Number(finalPrice) > 0;
 
-// Mientras Google está buscando la ruta.
 const priceIsCalculating =
   Boolean(pickup && destination) &&
   !priceReady &&
   routeLoading;
 
-// Solo mostrar "Tarifa no disponible" si Google terminó
-// y realmente no pudo obtener una ruta/distancia válida.
 const priceUnavailable =
   Boolean(pickup && destination) &&
   !priceReady &&
   !routeLoading &&
   distanceKm <= 0;
-
 const passengerCount = parseInt(passengers, 10) || 0;
 
 // ============================================================
