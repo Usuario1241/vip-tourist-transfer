@@ -3577,7 +3577,7 @@ returnTime: returnTime,
 </div>
 </footer>
 
-      <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-3">
+  <div className="fixed bottom-5 right-3 z-[100] flex flex-col gap-2 sm:bottom-5 sm:right-5 sm:gap-3">
 
   {/* LLAMAR */}
   <a
