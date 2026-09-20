@@ -31,6 +31,7 @@ const [travelDate, setTravelDate] = useState("");
 const [tripType, setTripType] = useState<"oneway" | "roundtrip" | "">("");
 const [returnDate, setReturnDate] = useState("");
 const [returnTime, setReturnTime] = useState("");
+const [returnScheduleError, setReturnScheduleError] = useState("");
 const [customerName, setCustomerName] = useState("");
 const [customerPhone, setCustomerPhone] = useState("");
 const [customerEmail, setCustomerEmail] = useState("");
@@ -2006,7 +2007,10 @@ setReturnTime("");
           type="date"
           value={returnDate}
           min={travelDate || undefined}
-          onChange={(e) => setReturnDate(e.target.value)}
+          onChange={(e) => {
+  setReturnDate(e.target.value);
+  setReturnScheduleError("");
+}}
           className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-4 outline-none focus:border-red-500"
         />
       </div>
@@ -2018,7 +2022,10 @@ setReturnTime("");
 
         <select
           value={returnTime}
-          onChange={(e) => setReturnTime(e.target.value)}
+          onChange={(e) => {
+  setReturnTime(e.target.value);
+  setReturnScheduleError("");
+}}
           className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-4 outline-none focus:border-red-500"
         >
           <option value="">Selecciona una hora</option>
@@ -2051,6 +2058,11 @@ setReturnTime("");
         </select>
       </div>
     </div>
+    {returnScheduleError && (
+  <div className="mt-4 rounded-xl border border-red-300 bg-white p-4 text-sm font-bold text-red-700">
+    ⚠️ {returnScheduleError}
+  </div>
+)}
   </div>
 )}
 
@@ -2319,14 +2331,37 @@ setReturnTime("");
   return;
 }
 
-if (
-  tripType === "roundtrip" &&
-  travelDate &&
-  returnDate &&
-  returnDate < travelDate
-) {
-  alert("La fecha de regreso no puede ser anterior a la fecha de ida.");
+if (tripType === "roundtrip" && travelDate && returnDate) {
+  if (returnDate < travelDate) {
+  setReturnScheduleError(
+    "La fecha de regreso no puede ser anterior a la fecha de ida."
+  );
   return;
+}
+
+  if (returnDate === travelDate) {
+    const timeToMinutes = (time: string) => {
+      const [clock, period] = time.split(" ");
+      let [hours, minutes] = clock.split(":").map(Number);
+
+      if (period === "AM" && hours === 12) hours = 0;
+      if (period === "PM" && hours !== 12) hours += 12;
+
+      return hours * 60 + minutes;
+    };
+
+    const departureMinutes = timeToMinutes(travelTime);
+    const returnMinutes = timeToMinutes(returnTime);
+
+    if (returnMinutes < departureMinutes + 60) {
+  setReturnScheduleError(
+    "Si el regreso es el mismo día, debe ser al menos 1 hora después de la hora de ida."
+  );
+  return;
+}
+
+setReturnScheduleError("");
+  }
 }
 
   if (pickup === destination) {
