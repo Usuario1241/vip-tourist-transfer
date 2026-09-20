@@ -38,6 +38,10 @@ const [flightNumber, setFlightNumber] = useState("");
 const [paymentMethod, setPaymentMethod] =
   useState<"card" | "cash" | "">("");
 
+  const [cancellationPolicyOpen, setCancellationPolicyOpen] = useState(false);
+const [cancellationPolicyAccepted, setCancellationPolicyAccepted] =
+  useState(false);
+
  const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
 const [authName, setAuthName] = useState("");
 const [authEmail, setAuthEmail] = useState("");
@@ -1416,6 +1420,83 @@ const vanUnavailable =
   </div>
 )}
 
+{/* MODAL POLÍTICA DE CANCELACIÓN */}
+{cancellationPolicyOpen && (
+  <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+    <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl md:p-9">
+
+      <button
+        type="button"
+        onClick={() => setCancellationPolicyOpen(false)}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-xl font-black text-zinc-700 transition hover:bg-red-600 hover:text-white"
+        aria-label="Cerrar política de cancelación"
+      >
+        ×
+      </button>
+
+      <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">
+        VIP Tourist Transfer
+      </p>
+
+      <h2 className="mt-3 pr-12 text-3xl font-black text-zinc-950">
+        Política de cancelación
+      </h2>
+
+      <div className="mt-6 space-y-5 text-sm leading-7 text-zinc-600">
+
+        <p>
+          Entendemos que los planes de viaje pueden cambiar. Las cancelaciones
+          realizadas con <strong>24 horas o más de anticipación</strong> a la
+          hora programada del servicio podrán recibir un{" "}
+          <strong>reembolso del 100% del valor del traslado</strong>.
+        </p>
+
+        <p>
+          Las cancelaciones realizadas con{" "}
+          <strong>menos de 24 horas de anticipación</strong> no serán
+          reembolsables.
+        </p>
+
+        <p>
+          En caso de <strong>no presentarse (No-Show)</strong> en el lugar y
+          hora acordados, el servicio se considerará utilizado y no aplicará
+          reembolso.
+        </p>
+
+        <p>
+          Si un vuelo se retrasa o cambia de horario, el cliente deberá
+          comunicarse con VIP Tourist Transfer tan pronto como sea posible.
+          Los retrasos de vuelos confirmados no se considerarán
+          automáticamente como una cancelación.
+        </p>
+
+        <p>
+          Cuando corresponda un reembolso, será procesado al{" "}
+          <strong>mismo método de pago utilizado para realizar la reserva</strong>.
+          El tiempo para que aparezca reflejado dependerá del proveedor de pago
+          o de la institución financiera.
+        </p>
+
+        <p>
+          Para solicitar una cancelación, el cliente deberá proporcionar su{" "}
+          <strong>código de reserva</strong> y los datos utilizados al realizar
+          la reservación.
+        </p>
+
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setCancellationPolicyOpen(false)}
+        className="mt-7 w-full rounded-xl bg-red-600 px-6 py-4 font-black text-white transition hover:bg-red-700"
+      >
+        Entendido
+      </button>
+
+    </div>
+  </div>
+)}
+
 {/* MODAL GESTIONAR / CANCELAR RESERVA */}
 {manageReservationOpen && (
   <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
@@ -2581,7 +2662,39 @@ Tipo de viaje: ${tripType === "roundtrip" ? "Ida y vuelta" : "Solo ida"}${
   </div>
 )}
 
-  {selectedVehicle && paymentMethod === "card" && priceReady && (
+{/* ACEPTACIÓN DE POLÍTICA DE CANCELACIÓN */}
+{selectedVehicle && priceReady && (
+  <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+    <label className="flex cursor-pointer items-start gap-3">
+      <input
+        type="checkbox"
+        checked={cancellationPolicyAccepted}
+        onChange={(e) => setCancellationPolicyAccepted(e.target.checked)}
+        className="mt-1 h-5 w-5 cursor-pointer accent-red-600"
+      />
+
+      <span className="text-sm leading-6 text-zinc-700">
+        He leído y acepto la{" "}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            setCancellationPolicyOpen(true);
+          }}
+          className="font-black text-red-600 underline transition hover:text-red-700"
+        >
+          Política de cancelación
+        </button>
+        .
+      </span>
+    </label>
+  </div>
+)}
+
+  {selectedVehicle &&
+  paymentMethod === "card" &&
+  priceReady &&
+  cancellationPolicyAccepted && (
   <div className="mt-5">
     <PayPalPayment
       amount={finalPrice}
@@ -2664,7 +2777,10 @@ returnTime: returnTime,
   </div>
 )}
 
-{selectedVehicle && paymentMethod === "cash" && priceReady && (
+{selectedVehicle &&
+  paymentMethod === "cash" &&
+  priceReady &&
+  cancellationPolicyAccepted && (
   <button
     type="button"
     onClick={async () => {
