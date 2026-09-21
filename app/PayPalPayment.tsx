@@ -25,21 +25,14 @@ export default function PayPalPayment({
     amount: string;
   } | null>(null);
 
-  const [reservationCode, setReservationCode] =
-    useState("");
-
-  const [paypalError, setPaypalError] =
-    useState("");
+  const [reservationCode, setReservationCode] = useState("");
+  const [paypalError, setPaypalError] = useState("");
 
   if (!clientId) {
     return (
       <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-center">
         <p className="font-black text-red-700">
           ⚠️ PayPal no está configurado
-        </p>
-
-        <p className="mt-1 text-sm text-red-600">
-          Falta NEXT_PUBLIC_PAYPAL_CLIENT_ID en .env.local
         </p>
       </div>
     );
@@ -49,7 +42,7 @@ export default function PayPalPayment({
     <div className="w-full">
       <PayPalScriptProvider
         options={{
-          clientId: clientId,
+          clientId,
           currency: "USD",
           intent: "capture",
         }}
@@ -66,54 +59,78 @@ export default function PayPalPayment({
               label: "paypal",
             }}
             forceReRender={[amount]}
-            createOrder={(data, actions) => {
-              return actions.order.create({
-                intent: "CAPTURE",
-                purchase_units: [
-                  {
-                    amount: {
-                      currency_code: "USD",
-                      value: Number(amount).toFixed(2),
-                    },
-                  },
-                ],
+            createOrder={async () => {
+              setPaypalError("");
+
+              const response = await fetch("/api/paypal", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  amount: Number(amount).toFixed(2),
+                }),
               });
+
+              const data = await response.json();
+
+              if (!response.ok || !data.orderId) {
+                throw new Error(
+                  data.error || "No se pudo crear la orden de PayPal"
+                );
+              }
+
+              return data.orderId;
             }}
             onApprove={async (data, actions) => {
-              if (!actions.order) return;
+              try {
+                if (!actions.order) {
+                  throw new Error(
+                    "No se pudo acceder a la orden de PayPal"
+                  );
+                }
 
-              const details =
-                await actions.order.capture();
+                const details = await actions.order.capture();
 
-              const code = `VIP-${Math.random()
-                .toString(36)
-                .substring(2, 8)
-                .toUpperCase()}`;
+                const code = `VIP-${Math.random()
+                  .toString(36)
+                  .substring(2, 8)
+                  .toUpperCase()}`;
 
-              setReservationCode(code);
+                const transactionId =
+                  details.purchase_units?.[0]?.payments?.captures?.[0]?.id ||
+                  details.id ||
+                  data.orderID;
 
-              const transactionId =
-                details.id ?? "Sin ID";
+                const paidAmount =
+                  details.purchase_units?.[0]?.payments?.captures?.[0]
+                    ?.amount?.value || Number(amount).toFixed(2);
 
-              const paidAmount =
-                Number(amount).toFixed(2);
+                setReservationCode(code);
 
-              setPaymentDetails({
-                id: transactionId,
-                amount: paidAmount,
-              });
+                setPaymentDetails({
+                  id: transactionId,
+                  amount: paidAmount,
+                });
 
-              onSuccess?.({
-                reservationCode: code,
-                transactionId,
-                amount: paidAmount,
-              });
+                onSuccess?.({
+                  reservationCode: code,
+                  transactionId,
+                  amount: paidAmount,
+                });
+              } catch (error) {
+                console.error("Error capturando PayPal:", error);
+
+                setPaypalError(
+                  "No se pudo confirmar el pago. Inténtalo nuevamente."
+                );
+              }
             }}
             onError={(err) => {
               console.error("Error de PayPal:", err);
 
               setPaypalError(
-                "PayPal no pudo cargar correctamente. Revisa la configuración."
+                "PayPal no pudo procesar la operación correctamente."
               );
             }}
           />
@@ -127,9 +144,7 @@ export default function PayPalPayment({
 
         {paymentDetails && (
           <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 p-5 text-center">
-            <div className="mb-2 text-3xl">
-              ✅
-            </div>
+            <div className="mb-2 text-3xl">✅</div>
 
             <h3 className="text-xl font-black text-green-700">
               Reserva confirmada
@@ -146,14 +161,11 @@ export default function PayPalPayment({
 
             <div className="mt-4 rounded-xl bg-white p-4 text-left text-sm">
               <p>
-                <strong>Monto:</strong>{" "}
-                US${paymentDetails.amount}
+                <strong>Monto:</strong> US${paymentDetails.amount}
               </p>
 
               <p className="mt-2 break-all">
-                <strong>
-                  ID de transacción:
-                </strong>{" "}
+                <strong>ID de transacción:</strong>{" "}
                 {paymentDetails.id}
               </p>
             </div>
