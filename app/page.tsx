@@ -265,30 +265,58 @@ const handleAuth = async () => {
 
   try {
     if (authMode === "register") {
-      if (!authName.trim()) {
-        setAuthMessage("Escribe tu nombre completo.");
-        return;
-      }
+  if (!authName.trim()) {
+    setAuthMessage("Escribe tu nombre completo.");
+    return;
+  }
 
-      const { error } = await supabase.auth.signUp({
-        email: authEmail.trim(),
-        password: authPassword,
-        options: {
-          data: {
-            full_name: authName.trim(),
-          },
-        },
-      });
+  const email = authEmail.trim().toLowerCase();
 
-      if (error) {
-        setAuthMessage(error.message);
-        return;
-      }
+  // Intentamos iniciar sesión primero para detectar
+  // si ya existe una cuenta con este correo.
+  const { error: loginCheckError } =
+    await supabase.auth.signInWithPassword({
+      email,
+      password: authPassword,
+    });
 
-      setAuthMessage(
-        "¡Cuenta creada! Revisa tu correo electrónico para confirmar tu cuenta."
-      );
-    }
+  if (!loginCheckError) {
+    await supabase.auth.signOut();
+
+    setAuthMessage(
+      "Ya existe una cuenta con este correo electrónico. Inicia sesión."
+    );
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password: authPassword,
+    options: {
+      data: {
+        full_name: authName.trim(),
+      },
+    },
+  });
+
+  if (error) {
+    setAuthMessage(error.message);
+    return;
+  }
+
+  // Supabase puede ocultar que un correo ya existe
+  // y devolver una identidad vacía.
+  if (data.user && data.user.identities?.length === 0) {
+    setAuthMessage(
+      "Ya existe una cuenta con este correo electrónico. Inicia sesión."
+    );
+    return;
+  }
+
+  setAuthMessage(
+    "¡Cuenta creada! Revisa tu correo electrónico para confirmar tu cuenta."
+  );
+}
 
     if (authMode === "login") {
   const { data, error } = await supabase.auth.signInWithPassword({
