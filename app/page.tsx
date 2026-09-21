@@ -51,6 +51,34 @@ const [authMessage, setAuthMessage] = useState("");
 const [authLoading, setAuthLoading] = useState(false);
 const [showPassword, setShowPassword] = useState(false);
 const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+type MyReservation = {
+  id: number;
+  created_at: string;
+  reservation_code: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  flight_number: string | null;
+  pickup: string | null;
+  destination: string | null;
+  passengers: number | null;
+  large_luggage: number | null;
+  carry_on_luggage: number | null;
+  vehicle: string | null;
+  travel_date: string | null;
+  travel_time: string | null;
+  trip_type: string | null;
+  return_date: string | null;
+  return_time: string | null;
+  amount: number | null;
+  payment_method: string | null;
+  transaction_id: string | null;
+};
+
+const [myReservationsOpen, setMyReservationsOpen] = useState(false);
+const [myReservations, setMyReservations] = useState<MyReservation[]>([]);
+const [myReservationsLoading, setMyReservationsLoading] = useState(false);
+const [myReservationsError, setMyReservationsError] = useState("");
 const [isNight, setIsNight] = useState(false);
 const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -240,6 +268,50 @@ const handleReviewSubmit = async () => {
     setReviewMessage("No se pudo enviar tu opinión. Inténtalo nuevamente.");
   } finally {
     setReviewSending(false);
+  }
+};
+
+const handleMyReservations = async () => {
+  setMyReservationsOpen(true);
+  setMyReservationsLoading(true);
+  setMyReservationsError("");
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      setMyReservationsError(
+        "Debes iniciar sesión para ver tus reservas."
+      );
+      return;
+    }
+
+    const response = await fetch("/api/my-reservations", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      setMyReservationsError(
+        result.message || "No se pudieron cargar tus reservas."
+      );
+      return;
+    }
+
+    setMyReservations(result.reservations || []);
+  } catch (error) {
+    console.error("Error cargando mis reservas:", error);
+    setMyReservationsError(
+      "Ocurrió un error al cargar tus reservas."
+    );
+  } finally {
+    setMyReservationsLoading(false);
   }
 };
 
@@ -1065,7 +1137,7 @@ const vanUnavailable =
       {/* HEADER */}
 <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
 
-  <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 lg:px-8">
+  <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-2 lg:px-4">
 
     {/* LOGO */}
     <a
@@ -1076,7 +1148,7 @@ const vanUnavailable =
       <img
         src="/vip-logo-nuevo.png"
         alt="VIP Tourist Transfer"
-        className="h-20 w-auto object-contain md:h-24"
+        className="h-24 w-auto object-contain md:h-28 lg:h-32"
       />
     </a>
 
@@ -1108,56 +1180,64 @@ const vanUnavailable =
     </nav>
 
     {/* CUENTA Y RESERVA - COMPUTADORA */}
-    <div className="hidden items-center gap-3 lg:flex">
+<div className="hidden items-center gap-2 lg:flex">
 
-      {currentUserEmail ? (
-        <>
-          <span className="max-w-[180px] truncate text-sm font-bold text-zinc-700">
-            {currentUserEmail}
-          </span>
+  {currentUserEmail ? (
+    <>
+      <span className="max-w-[120px] truncate text-xs font-bold text-zinc-600">
+        {currentUserEmail}
+      </span>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
-          >
-            Cerrar sesión
-          </button>
-        </>
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode("login");
-              setAuthMessage("");
-            }}
-            className="rounded-full border border-zinc-300 px-5 py-3 text-sm font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
-          >
-            Iniciar sesión
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode("register");
-              setAuthMessage("");
-            }}
-            className="rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800"
-          >
-            Crear cuenta
-          </button>
-        </>
-      )}
-
-      <a
-        href="#reservar"
-        className="rounded-full bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:bg-red-700"
+      <button
+        type="button"
+        onClick={handleMyReservations}
+        className="whitespace-nowrap rounded-full bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
       >
-        Reservar ahora
-      </a>
+        Mis reservas
+      </button>
 
-    </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="whitespace-nowrap rounded-full border border-zinc-300 px-3 py-2 text-xs font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
+      >
+        Cerrar sesión
+      </button>
+    </>
+  ) : (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setAuthMode("login");
+          setAuthMessage("");
+        }}
+        className="whitespace-nowrap rounded-full border border-zinc-300 px-3 py-2 text-xs font-black text-zinc-800 transition hover:border-red-600 hover:text-red-600"
+      >
+        Iniciar sesión
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setAuthMode("register");
+          setAuthMessage("");
+        }}
+        className="whitespace-nowrap rounded-full bg-zinc-950 px-3 py-2 text-xs font-black text-white transition hover:bg-zinc-800"
+      >
+        Crear cuenta
+      </button>
+    </>
+  )}
+
+  <a
+    href="#reservar"
+    className="whitespace-nowrap rounded-full bg-red-600 px-4 py-2 text-xs font-black text-white shadow-lg transition hover:bg-red-700"
+  >
+    Reservar ahora
+  </a>
+
+</div>
 
     {/* MENÚ ☰ - CELULAR Y TABLET */}
     <button
@@ -1256,6 +1336,17 @@ const vanUnavailable =
             <p className="mb-3 break-all text-sm font-bold text-zinc-600">
               {currentUserEmail}
             </p>
+
+            <button
+  type="button"
+  onClick={() => {
+    setMobileMenuOpen(false);
+    handleMyReservations();
+  }}
+  className="mb-3 w-full rounded-xl bg-red-600 px-5 py-4 font-black text-white transition hover:bg-red-700"
+>
+  Mis reservas
+</button>
 
             <button
               type="button"
@@ -1448,6 +1539,184 @@ const vanUnavailable =
     </div>
   </div>
 )}
+
+{/* MODAL MIS RESERVAS */}
+{myReservationsOpen && (
+  <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+    <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl md:p-9">
+
+      <button
+        type="button"
+        onClick={() => setMyReservationsOpen(false)}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-xl font-black text-zinc-700 transition hover:bg-red-600 hover:text-white"
+        aria-label="Cerrar mis reservas"
+      >
+        ×
+      </button>
+
+      <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">
+        VIP Tourist Transfer
+      </p>
+
+      <h2 className="mt-3 pr-12 text-3xl font-black text-zinc-950">
+        Mis reservas
+      </h2>
+
+      <p className="mt-2 text-sm text-zinc-500">
+        Consulta y gestiona los viajes asociados a tu cuenta.
+      </p>
+
+      {myReservationsLoading ? (
+        <div className="py-12 text-center font-bold text-zinc-600">
+          Cargando tus reservas...
+        </div>
+      ) : myReservationsError ? (
+        <div className="mt-6 rounded-2xl bg-red-50 p-4 font-bold text-red-700">
+          {myReservationsError}
+        </div>
+      ) : myReservations.length === 0 ? (
+        <div className="mt-6 rounded-2xl bg-zinc-100 p-8 text-center">
+          <p className="font-black text-zinc-900">
+            Todavía no tienes reservas asociadas a esta cuenta.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-7 space-y-4">
+          {myReservations.map((reservation) => (
+            <div
+              key={reservation.id}
+              className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wider text-red-600">
+                    Código de reserva
+                  </p>
+
+                  <p className="mt-1 text-xl font-black text-zinc-950">
+                    {reservation.reservation_code || "Sin código"}
+                  </p>
+                </div>
+
+                <div className="text-left md:text-right">
+                  <p className="text-sm font-bold text-zinc-500">
+                    Total
+                  </p>
+                  <p className="text-2xl font-black text-zinc-950">
+                    US${Number(reservation.amount || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 border-t border-zinc-100 pt-5 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-bold uppercase text-zinc-400">
+                    Recogida
+                  </p>
+                  <p className="mt-1 font-bold text-zinc-800">
+                    {reservation.pickup || "No especificada"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase text-zinc-400">
+                    Destino
+                  </p>
+                  <p className="mt-1 font-bold text-zinc-800">
+                    {reservation.destination || "No especificado"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase text-zinc-400">
+                    Fecha y hora
+                  </p>
+                  <p className="mt-1 font-bold text-zinc-800">
+                    {reservation.travel_date
+  ? new Date(
+      `${reservation.travel_date}T${reservation.travel_time || "00:00:00"}`
+    ).toLocaleDateString("es-DO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+  : "—"}
+{" · "}
+{reservation.travel_time
+  ? new Date(
+      `2000-01-01T${reservation.travel_time}`
+    ).toLocaleTimeString("es-DO", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+  : ""}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase text-zinc-400">
+                    Vehículo
+                  </p>
+                  <p className="mt-1 font-bold text-zinc-800">
+                    {reservation.vehicle === "sedan"
+                      ? "Sedán Ejecutivo"
+                      : reservation.vehicle === "suv"
+                      ? "Minivan Premium"
+                      : reservation.vehicle === "van"
+                      ? "Van Ejecutiva"
+                      : reservation.vehicle || "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase text-zinc-400">
+                    Pasajeros
+                  </p>
+                  <p className="mt-1 font-bold text-zinc-800">
+                    {reservation.passengers ?? "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase text-zinc-400">
+                    Tipo de viaje
+                  </p>
+                  <p className="mt-1 font-bold text-zinc-800">
+                    {reservation.trip_type === "roundtrip"
+                      ? "Ida y vuelta"
+                      : "Solo ida"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setManageReservationCode(
+                    reservation.reservation_code || ""
+                  );
+                  setManageReservationEmail(
+                    reservation.customer_email || currentUserEmail || ""
+                  );
+                  setCancellationReason("");
+                  setCancellationMessage("");
+                  setCancellationSuccess(false);
+                  setMyReservationsOpen(false);
+                  setManageReservationOpen(true);
+                }}
+                className="mt-5 w-full rounded-xl bg-zinc-950 px-5 py-3 font-black text-white transition hover:bg-red-600 md:w-auto"
+              >
+                Gestionar reserva
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
 
 {/* MODAL POLÍTICA DE CANCELACIÓN */}
 {cancellationPolicyOpen && (
