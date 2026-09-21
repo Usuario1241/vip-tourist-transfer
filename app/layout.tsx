@@ -14,17 +14,38 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VIP Tourist Transfers | Traslados Privados en República Dominicana",
+  metadataBase: new URL("https://www.viptouristtransfer.com"),
+
+  title: "VIP Tourist Transfer | Traslados Privados en República Dominicana",
+
   description:
-    "Traslados privados VIP desde aeropuertos, hoteles y destinos turísticos en República Dominicana. Servicio seguro, puntual y confortable.",
+    "Reserva traslados privados en República Dominicana. Transporte desde aeropuertos, hoteles y destinos como Punta Cana, Santo Domingo, La Romana y más.",
+
   keywords: [
-    "VIP Tourist Transfers",
-    "traslados República Dominicana",
-    "transporte aeropuerto Santo Domingo",
-    "transfer aeropuerto SDQ",
+    "VIP Tourist Transfer",
+    "traslados privados República Dominicana",
     "transfer Punta Cana",
+    "Punta Cana airport transfer",
+    "Santo Domingo airport transfer",
+    "transfer aeropuerto SDQ",
+    "transporte aeropuerto Santo Domingo",
     "transporte privado República Dominicana",
+    "traslados aeropuerto República Dominicana",
   ],
+
+  alternates: {
+    canonical: "/",
+  },
+
+  openGraph: {
+    title: "VIP Tourist Transfer | Traslados Privados en República Dominicana",
+    description:
+      "Traslados privados desde aeropuertos, hoteles y destinos turísticos de República Dominicana.",
+    url: "https://www.viptouristtransfer.com/",
+    siteName: "VIP Tourist Transfer",
+    locale: "es_DO",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
