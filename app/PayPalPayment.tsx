@@ -9,8 +9,10 @@ import {
 export default function PayPalPayment({
   amount,
   onSuccess,
+  onBeforePayment,
 }: {
   amount: string;
+  onBeforePayment?: () => boolean;
   onSuccess?: (data: {
     reservationCode: string;
     transactionId: string;
@@ -61,6 +63,12 @@ export default function PayPalPayment({
             forceReRender={[amount]}
             createOrder={async () => {
               setPaypalError("");
+
+              if (onBeforePayment && !onBeforePayment()) {
+  throw new Error(
+    "La fecha o la hora de la reserva ya no está disponible."
+  );
+}
 
               const response = await fetch("/api/paypal", {
                 method: "POST",
