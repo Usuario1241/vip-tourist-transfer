@@ -131,6 +131,13 @@ const [authMessage, setAuthMessage] = useState("");
 const [authLoading, setAuthLoading] = useState(false);
 const [showPassword, setShowPassword] = useState(false);
 const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
+const [avatarUploading, setAvatarUploading] = useState(false);
+const [avatarMessage, setAvatarMessage] = useState("");
+const ADMIN_EMAIL = "reservaviptouristtransfers@gmail.com";
+
+const isAdmin =
+  currentUserEmail?.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
 type MyReservation = {
   id: number;
   created_at: string;
@@ -168,15 +175,20 @@ type Review = {
   rating: number;
   comment: string;
   created_at: string;
+  avatar_url: string | null;
 };
 
 const [reviews, setReviews] = useState<Review[]>([]);
 const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 const [reviewName, setReviewName] = useState("");
-const [reviewRating, setReviewRating] = useState(5);
+const [reviewRating, setReviewRating] = useState(0);
 const [reviewComment, setReviewComment] = useState("");
 const [reviewSending, setReviewSending] = useState(false);
 const [reviewMessage, setReviewMessage] = useState("");
+const [adminReviewsOpen, setAdminReviewsOpen] = useState(false);
+const [pendingReviews, setPendingReviews] = useState<Review[]>([]);
+const [pendingReviewsLoading, setPendingReviewsLoading] = useState(false);
+const [pendingReviewsMessage, setPendingReviewsMessage] = useState("");
 
 useEffect(() => {
   const updateMapTheme = () => {
@@ -265,6 +277,9 @@ useEffect(() => {
     } = await supabase.auth.getSession();
 
     setCurrentUserEmail(session?.user?.email ?? null);
+    setCurrentUserAvatar(
+      session?.user?.user_metadata?.avatar_url ?? null
+    );
   };
 
   loadUser();
@@ -273,6 +288,9 @@ useEffect(() => {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((_event, session) => {
     setCurrentUserEmail(session?.user?.email ?? null);
+    setCurrentUserAvatar(
+      session?.user?.user_metadata?.avatar_url ?? null
+    );
   });
 
   return () => {
@@ -284,7 +302,7 @@ useEffect(() => {
   const loadReviews = async () => {
     const { data, error } = await supabase
       .from("reviews")
-      .select("id, name, rating, comment, created_at")
+      .select("id, name, rating, comment, created_at, avatar_url")
       .eq("approved", true)
       .order("created_at", { ascending: false });
 
@@ -375,6 +393,25 @@ const handleReviewSubmit = async () => {
     return;
   }
 
+  if (reviewRating < 1 || reviewRating > 5) {
+  setReviewMessage(
+    language === "es"
+      ? "Selecciona de 1 a 5 estrellas."
+      : language === "en"
+      ? "Select from 1 to 5 stars."
+      : language === "fr"
+      ? "Sélectionnez de 1 à 5 étoiles."
+      : language === "de"
+      ? "Wählen Sie 1 bis 5 Sterne."
+      : language === "it"
+      ? "Seleziona da 1 a 5 stelle."
+      : language === "pt"
+      ? "Selecione de 1 a 5 estrelas."
+      : "1〜5つの星を選択してください。"
+  );
+  return;
+}
+
   if (cleanComment.length < 3) {
     setReviewMessage(reviewMessages[language].commentTooShort);
     return;
@@ -387,14 +424,22 @@ const handleReviewSubmit = async () => {
 
   setReviewSending(true);
 
-  try {
-    const { error } = await supabase
-      .from("reviews")
-      .insert({
-        name: cleanName,
-        rating: reviewRating,
-        comment: cleanComment,
-      });
+try {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const avatarUrl =
+    session?.user?.user_metadata?.avatar_url ?? currentUserAvatar ?? null;
+
+  const { error } = await supabase
+    .from("reviews")
+    .insert({
+      name: cleanName,
+      rating: reviewRating,
+      comment: cleanComment,
+      avatar_url: avatarUrl,
+    });
 
     if (error) {
       console.error("Error enviando opinión:", error);
@@ -403,7 +448,7 @@ const handleReviewSubmit = async () => {
     }
 
     setReviewName("");
-    setReviewRating(5);
+    setReviewRating(0);
     setReviewComment("");
     setReviewMessage(reviewMessages[language].sendSuccess);
   } catch (error) {
@@ -411,6 +456,140 @@ const handleReviewSubmit = async () => {
     setReviewMessage(reviewMessages[language].sendError);
   } finally {
     setReviewSending(false);
+  }
+};
+
+const loadPendingReviews = async () => {
+  setAdminReviewsOpen(true);
+  setPendingReviewsLoading(true);
+  setPendingReviewsMessage("");
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      setPendingReviewsMessage("Debes iniciar sesión como administrador.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/reviews", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      setPendingReviewsMessage(
+        result.message || "No se pudieron cargar las opiniones pendientes."
+      );
+      return;
+    }
+
+    setPendingReviews(result.reviews || []);
+  } catch (error) {
+    console.error("Error cargando opiniones pendientes:", error);
+    setPendingReviewsMessage("Ocurrió un error cargando las opiniones.");
+  } finally {
+    setPendingReviewsLoading(false);
+  }
+};
+
+const approveReview = async (reviewId: number) => {
+  setPendingReviewsMessage("");
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      setPendingReviewsMessage("Debes iniciar sesión como administrador.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/reviews", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        id: reviewId,
+        action: "approve",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      setPendingReviewsMessage(
+        result.message || "No se pudo aprobar la opinión."
+      );
+      return;
+    }
+
+    setPendingReviews((current) =>
+      current.filter((review) => review.id !== reviewId)
+    );
+
+    const { data } = await supabase
+      .from("reviews")
+      .select("id, name, rating, comment, created_at, avatar_url")
+      .eq("approved", true)
+      .order("created_at", { ascending: false });
+
+    setReviews(data || []);
+  } catch (error) {
+    console.error("Error aprobando opinión:", error);
+    setPendingReviewsMessage("No se pudo aprobar la opinión.");
+  }
+};
+
+const rejectReview = async (reviewId: number) => {
+  setPendingReviewsMessage("");
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      setPendingReviewsMessage("Debes iniciar sesión como administrador.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/reviews", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        id: reviewId,
+        action: "delete",
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      setPendingReviewsMessage(
+        result.message || "No se pudo eliminar la opinión."
+      );
+      return;
+    }
+
+    setPendingReviews((current) =>
+      current.filter((review) => review.id !== reviewId)
+    );
+  } catch (error) {
+    console.error("Error eliminando opinión:", error);
+    setPendingReviewsMessage("No se pudo eliminar la opinión.");
   }
 };
 
@@ -496,9 +675,80 @@ const handleMyReservations = async () => {
   }
 };
 
+const handleAvatarUpload = async (
+  event: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = event.target.files?.[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    setAvatarMessage("Selecciona una imagen válida.");
+    event.target.value = "";
+    return;
+  }
+
+  setAvatarUploading(true);
+  setAvatarMessage("");
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const user = session?.user;
+
+    if (!user) {
+      setAvatarMessage("Debes iniciar sesión para cambiar tu foto.");
+      return;
+    }
+
+    const filePath = `${user.id}/avatar`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, {
+        upsert: true,
+        contentType: file.type,
+        cacheControl: "0",
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    const publicUrl = data.publicUrl;
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        avatar_url: publicUrl,
+      },
+    });
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    setCurrentUserAvatar(publicUrl);
+    setAvatarMessage("Foto de perfil actualizada.");
+  } catch (error) {
+    console.error("Error subiendo foto de perfil:", error);
+    setAvatarMessage("No se pudo actualizar la foto.");
+  } finally {
+    setAvatarUploading(false);
+    event.target.value = "";
+  }
+};
+
 const handleLogout = async () => {
   await supabase.auth.signOut();
   setCurrentUserEmail(null);
+  setCurrentUserAvatar(null);
+  setAvatarMessage("");
 };
 
 const authMessages = {
@@ -3567,10 +3817,32 @@ const vanUnavailable =
   </div>
 
   {currentUserEmail ? (
-    <>
-      <span className="max-w-[120px] truncate text-xs font-bold text-zinc-600">
-        {currentUserEmail}
-      </span>
+  <>
+    <label className="relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-zinc-200 bg-zinc-100 transition hover:border-red-600">
+      {currentUserAvatar ? (
+        <img
+          src={currentUserAvatar}
+          alt="Foto de perfil"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span className="text-sm font-black text-zinc-600">
+          {currentUserEmail.charAt(0).toUpperCase()}
+        </span>
+      )}
+
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleAvatarUpload}
+        disabled={avatarUploading}
+        className="hidden"
+      />
+    </label>
+
+    <span className="max-w-[120px] truncate text-xs font-bold text-zinc-600">
+      {currentUserEmail}
+    </span>
 
       <button
         type="button"
@@ -3579,6 +3851,16 @@ const vanUnavailable =
       >
         {text.myReservations}
       </button>
+
+      {isAdmin && (
+  <button
+    type="button"
+    onClick={loadPendingReviews}
+    className="whitespace-nowrap rounded-full bg-zinc-950 px-3 py-2 text-xs font-black text-white transition hover:bg-zinc-800"
+  >
+    Administrar opiniones
+  </button>
+)}
 
       <button
         type="button"
@@ -3740,9 +4022,45 @@ const vanUnavailable =
         {/* CUENTA */}
         {currentUserEmail ? (
           <div className="mt-5">
-            <p className="mb-3 break-all text-sm font-bold text-zinc-600">
-              {currentUserEmail}
-            </p>
+  <div className="mb-4 flex items-center gap-3">
+    <label className="relative flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-zinc-200 bg-zinc-100">
+      {currentUserAvatar ? (
+        <img
+          src={currentUserAvatar}
+          alt="Foto de perfil"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span className="text-lg font-black text-zinc-600">
+          {currentUserEmail.charAt(0).toUpperCase()}
+        </span>
+      )}
+
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleAvatarUpload}
+        disabled={avatarUploading}
+        className="hidden"
+      />
+    </label>
+
+    <div className="min-w-0">
+      <p className="break-all text-sm font-bold text-zinc-600">
+        {currentUserEmail}
+      </p>
+
+      <p className="mt-1 text-xs font-semibold text-zinc-400">
+        {avatarUploading ? "Subiendo foto..." : "Toca la foto para cambiarla"}
+      </p>
+    </div>
+  </div>
+
+  {avatarMessage && (
+    <p className="mb-3 text-xs font-bold text-zinc-600">
+      {avatarMessage}
+    </p>
+  )}
 
             <button
   type="button"
@@ -3754,6 +4072,19 @@ const vanUnavailable =
 >
   {text.myReservations}
 </button>
+
+{isAdmin && (
+  <button
+    type="button"
+    onClick={() => {
+      setMobileMenuOpen(false);
+      loadPendingReviews();
+    }}
+    className="mb-3 w-full rounded-xl bg-zinc-950 px-5 py-4 font-black text-white transition hover:bg-zinc-800"
+  >
+    Administrar opiniones
+  </button>
+)}
 
             <button
               type="button"
@@ -4120,6 +4451,103 @@ const vanUnavailable =
               >
                 {text.manageReservation}
               </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{/* MODAL ADMINISTRAR OPINIONES */}
+{adminReviewsOpen && (
+  <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+    <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl md:p-9">
+
+      <button
+        type="button"
+        onClick={() => setAdminReviewsOpen(false)}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-xl font-black text-zinc-700 transition hover:bg-red-600 hover:text-white"
+        aria-label="Cerrar"
+      >
+        ×
+      </button>
+
+      <p className="text-sm font-black uppercase tracking-[0.2em] text-red-600">
+        VIP Tourist Transfer
+      </p>
+
+      <h2 className="mt-3 pr-12 text-3xl font-black text-zinc-950">
+        Opiniones pendientes
+      </h2>
+
+      <p className="mt-2 text-sm text-zinc-500">
+        Revisa las opiniones antes de publicarlas en la página.
+      </p>
+
+      {pendingReviewsMessage && (
+        <div className="mt-5 rounded-2xl bg-red-50 p-4 font-bold text-red-700">
+          {pendingReviewsMessage}
+        </div>
+      )}
+
+      {pendingReviewsLoading ? (
+        <div className="py-12 text-center font-bold text-zinc-600">
+          Cargando opiniones...
+        </div>
+      ) : pendingReviews.length === 0 ? (
+        <div className="mt-6 rounded-2xl bg-zinc-100 p-8 text-center">
+          <p className="font-black text-zinc-900">
+            No hay opiniones pendientes.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-7 space-y-4">
+          {pendingReviews.map((review) => (
+            <div
+              key={review.id}
+              className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-lg font-black text-zinc-950">
+                    {review.name}
+                  </p>
+
+                  <p className="mt-1 text-xl text-yellow-500">
+                    {"★".repeat(review.rating)}
+                    <span className="text-zinc-300">
+                      {"★".repeat(5 - review.rating)}
+                    </span>
+                  </p>
+                </div>
+
+                <p className="text-xs font-bold text-zinc-400">
+                  {new Date(review.created_at).toLocaleDateString("es-DO")}
+                </p>
+              </div>
+
+              <p className="mt-4 leading-7 text-zinc-700">
+                {review.comment}
+              </p>
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => approveReview(review.id)}
+                  className="rounded-xl bg-green-600 px-5 py-3 font-black text-white transition hover:bg-green-700"
+                >
+                  ✓ Aprobar y publicar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => rejectReview(review.id)}
+                  className="rounded-xl bg-red-600 px-5 py-3 font-black text-white transition hover:bg-red-700"
+                >
+                  ✕ Eliminar
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -6138,38 +6566,97 @@ returnTime: returnTime,
       </p>
     </div>
 
-    {/* CARRUSEL DE OPINIONES APROBADAS */}
-<div className="mx-auto mt-12 max-w-4xl">
+    {/* OPINIONES APROBADAS */}
+<div className="mx-auto mt-12 max-w-7xl">
   {reviews.length > 0 ? (
-    <div className="relative overflow-hidden rounded-[2rem] border border-zinc-200 bg-zinc-50 px-6 py-10 shadow-sm md:px-16 md:py-14">
-
-      <div className="text-center">
-        <div className="flex justify-center gap-1 text-2xl">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <span
-              key={index}
-              className={
-                index < reviews[currentReviewIndex].rating
-                  ? "text-yellow-500"
-                  : "text-zinc-300"
-              }
+    <>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {reviews
+          .slice(
+            currentReviewIndex,
+            currentReviewIndex + (reviews.length >= 3 ? 3 : reviews.length)
+          )
+          .map((review) => (
+            <div
+              key={review.id}
+              className="flex min-h-[320px] flex-col rounded-[2rem] border border-zinc-200 bg-zinc-50 p-7 text-center shadow-sm"
             >
-              ★
-            </span>
+              <div className="mb-5 flex justify-center">
+                {review.avatar_url ? (
+                  <img
+                    src={review.avatar_url}
+                    alt={review.name}
+                    className="h-16 w-16 rounded-full border-2 border-white object-cover shadow-md"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 text-xl font-black text-white shadow-md">
+                    {review.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-center gap-1 text-2xl">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <span
+                    key={index}
+                    className={
+                      index < review.rating
+                        ? "text-yellow-500"
+                        : "text-zinc-300"
+                    }
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+
+              <h3 className="mt-4 text-xl font-black text-zinc-950">
+                {review.name}
+              </h3>
+
+              <p className="mt-4 flex-1 leading-7 text-zinc-600">
+               “
+{review.name === "Axel Roble"
+  ? language === "es"
+    ? "Excelente experiencia de prueba. El proceso de reserva fue rápido, sencillo y fácil de usar desde el celular. La información del traslado se muestra claramente y el sistema permite completar la reserva de forma cómoda. Muy buena presentación y funcionamiento."
+    : language === "en"
+    ? "Excellent test experience. The booking process was quick, simple, and easy to use from a mobile phone. The transfer information is displayed clearly, and the system makes it easy to complete the booking. Very good presentation and functionality."
+    : language === "fr"
+    ? "Excellente expérience de test. Le processus de réservation a été rapide, simple et facile à utiliser depuis un téléphone portable. Les informations sur le transfert sont clairement affichées et le système permet de finaliser facilement la réservation. Très bonne présentation et fonctionnement."
+    : language === "de"
+    ? "Ausgezeichnete Testerfahrung. Der Buchungsprozess war schnell, einfach und bequem über das Mobiltelefon zu bedienen. Die Transferinformationen werden klar angezeigt und das System ermöglicht eine unkomplizierte Buchung. Sehr gute Präsentation und Funktionalität."
+    : language === "it"
+    ? "Eccellente esperienza di prova. Il processo di prenotazione è stato rapido, semplice e facile da usare dal cellulare. Le informazioni sul trasferimento sono mostrate chiaramente e il sistema consente di completare comodamente la prenotazione. Ottima presentazione e funzionalità."
+    : language === "pt"
+    ? "Excelente experiência de teste. O processo de reserva foi rápido, simples e fácil de usar pelo celular. As informações do traslado são exibidas claramente e o sistema permite concluir a reserva de forma confortável. Ótima apresentação e funcionamento."
+    : "素晴らしいテスト体験でした。予約手続きは迅速で簡単で、スマートフォンからも使いやすかったです。送迎情報が分かりやすく表示され、スムーズに予約を完了できます。見た目も機能もとても良いです。"
+  : review.comment}
+”
+              </p>
+
+              <p className="mt-5 text-xs font-bold text-zinc-400">
+                {new Date(review.created_at).toLocaleDateString(
+                  language === "es"
+                    ? "es-DO"
+                    : language === "en"
+                    ? "en-US"
+                    : language === "fr"
+                    ? "fr-FR"
+                    : language === "de"
+                    ? "de-DE"
+                    : language === "it"
+                    ? "it-IT"
+                    : language === "pt"
+                    ? "pt-BR"
+                    : "ja-JP"
+                )}
+              </p>
+            </div>
           ))}
-        </div>
-
-        <p className="mx-auto mt-7 max-w-3xl text-xl font-semibold leading-9 text-zinc-700 md:text-2xl md:leading-10">
-          “{reviews[currentReviewIndex].comment}”
-        </p>
-
-        <p className="mt-7 text-lg font-black text-zinc-950">
-          {reviews[currentReviewIndex].name}
-        </p>
       </div>
 
       {reviews.length > 1 && (
-        <>
+        <div className="mt-8 flex items-center justify-center gap-4">
           <button
             type="button"
             onClick={() =>
@@ -6177,7 +6664,7 @@ returnTime: returnTime,
                 current === 0 ? reviews.length - 1 : current - 1
               )
             }
-            className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-2xl font-black text-zinc-900 shadow-md transition hover:bg-zinc-950 hover:text-white md:left-6"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-2xl font-black shadow-md transition hover:bg-zinc-950 hover:text-white"
             aria-label={reviewsUi[language].previousReview}
           >
             ‹
@@ -6190,33 +6677,14 @@ returnTime: returnTime,
                 current === reviews.length - 1 ? 0 : current + 1
               )
             }
-            className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white text-2xl font-black text-zinc-900 shadow-md transition hover:bg-zinc-950 hover:text-white md:right-6"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-2xl font-black shadow-md transition hover:bg-zinc-950 hover:text-white"
             aria-label={reviewsUi[language].nextReview}
           >
             ›
           </button>
-        </>
-      )}
-
-      {reviews.length > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
-          {reviews.map((review, index) => (
-            <button
-              key={review.id}
-              type="button"
-              onClick={() => setCurrentReviewIndex(index)}
-              className={`h-2.5 rounded-full transition-all ${
-                index === currentReviewIndex
-                  ? "w-8 bg-red-600"
-                  : "w-2.5 bg-zinc-300"
-              }`}
-              aria-label={`${reviewsUi[language].viewReview} ${index + 1}`}
-            />
-          ))}
         </div>
       )}
-
-    </div>
+    </>
   ) : (
     <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-8 text-center">
       <p className="font-bold text-zinc-600">
@@ -6225,8 +6693,6 @@ returnTime: returnTime,
     </div>
   )}
 </div>
-
-    {/* FORMULARIO PARA DEJAR OPINIÓN */}
     <div className="mx-auto mt-14 max-w-2xl rounded-[2rem] border border-zinc-200 bg-white p-7 shadow-xl md:p-10">
 
       <h3 className="text-center text-2xl font-black text-zinc-950">
