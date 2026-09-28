@@ -172,6 +172,7 @@ const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 type Review = {
   id: number;
   name: string;
+  user_id: string | null;
   rating: number;
   comment: string;
   created_at: string;
@@ -302,7 +303,7 @@ useEffect(() => {
   const loadReviews = async () => {
     const { data, error } = await supabase
       .from("reviews")
-      .select("id, name, rating, comment, created_at, avatar_url")
+      .select("id, name, rating, comment, created_at, avatar_url, user_id")
       .eq("approved", true)
       .order("created_at", { ascending: false });
 
@@ -435,11 +436,12 @@ try {
   const { error } = await supabase
     .from("reviews")
     .insert({
-      name: cleanName,
-      rating: reviewRating,
-      comment: cleanComment,
-      avatar_url: avatarUrl,
-    });
+  name: cleanName,
+  user_id: session?.user?.id ?? null,
+  rating: reviewRating,
+  comment: cleanComment,
+  avatar_url: avatarUrl,
+});
 
     if (error) {
       console.error("Error enviando opinión:", error);
@@ -539,7 +541,7 @@ const approveReview = async (reviewId: number) => {
 
     const { data } = await supabase
       .from("reviews")
-      .select("id, name, rating, comment, created_at, avatar_url")
+      .select("id, name, rating, comment, created_at, avatar_url, user_id")
       .eq("approved", true)
       .order("created_at", { ascending: false });
 
@@ -688,6 +690,68 @@ const handleAvatarUpload = async (
     return;
   }
 
+  const optimizeAvatar = (imageFile: File): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(imageFile);
+
+    img.onload = () => {
+      const size = 512;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("No se pudo procesar la imagen."));
+        return;
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      const sourceSize = Math.min(img.width, img.height);
+      const sourceX = (img.width - sourceSize) / 2;
+      const sourceY = (img.height - sourceSize) / 2;
+
+      ctx.drawImage(
+        img,
+        sourceX,
+        sourceY,
+        sourceSize,
+        sourceSize,
+        0,
+        0,
+        size,
+        size
+      );
+
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("No se pudo generar el avatar."));
+          }
+        },
+        "image/jpeg",
+        0.95
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("No se pudo leer la imagen."));
+    };
+
+    img.src = objectUrl;
+  });
+};
+
   setAvatarUploading(true);
   setAvatarMessage("");
 
@@ -705,13 +769,15 @@ const handleAvatarUpload = async (
 
     const filePath = `${user.id}/avatar`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(filePath, file, {
-        upsert: true,
-        contentType: file.type,
-        cacheControl: "0",
-      });
+    const optimizedFile = await optimizeAvatar(file);
+
+const { error: uploadError } = await supabase.storage
+  .from("avatars")
+  .upload(filePath, optimizedFile, {
+    upsert: true,
+    contentType: "image/jpeg",
+    cacheControl: "0",
+  });
 
     if (uploadError) {
       throw uploadError;
@@ -734,7 +800,25 @@ const handleAvatarUpload = async (
     }
 
     setCurrentUserAvatar(publicUrl);
-    setAvatarMessage("Foto de perfil actualizada.");
+
+const { error: reviewAvatarError } = await supabase
+  .from("reviews")
+  .update({ avatar_url: publicUrl })
+  .eq("user_id", user.id);
+
+if (reviewAvatarError) {
+  console.error("Error actualizando foto en opiniones:", reviewAvatarError);
+}
+
+setReviews((currentReviews) =>
+  currentReviews.map((review) =>
+    review.user_id === user.id
+      ? { ...review, avatar_url: publicUrl }
+      : review
+  )
+);
+
+setAvatarMessage("Foto de perfil actualizada.");
   } catch (error) {
     console.error("Error subiendo foto de perfil:", error);
     setAvatarMessage("No se pudo actualizar la foto.");
@@ -3749,27 +3833,27 @@ const vanUnavailable =
   },
 ];
   return (
-    <main className="min-h-screen bg-white text-zinc-950">
+    <main className="min-h-screen overflow-x-hidden bg-white text-zinc-950">
       {/* HEADER */}
-<header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
+<header className="sticky top-0 z-[200] border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
 
-  <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-2 lg:px-4">
-
+  <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-2 lg:px-6">
+    
     {/* LOGO */}
     <a
       href="#inicio"
-      className="flex items-center"
+      className="flex shrink-0 items-center"
       onClick={() => setMobileMenuOpen(false)}
     >
       <img
         src="/vip-logo-nuevo.png"
         alt="VIP Tourist Transfer"
-        className="h-24 w-auto object-contain md:h-28 lg:h-32"
+        className="h-20 w-auto max-w-[220px] object-contain md:h-24 lg:h-28 lg:max-w-[280px]"
       />
     </a>
 
     {/* MENÚ NORMAL - COMPUTADORA */}
-    <nav className="hidden items-center gap-8 text-sm font-bold text-zinc-700 lg:flex">
+    <nav className="hidden items-center gap-4 text-sm font-bold text-zinc-700 lg:flex">
       <a href="#inicio" className="transition hover:text-red-600">
         {text.home}
       </a>
@@ -3840,17 +3924,15 @@ const vanUnavailable =
       />
     </label>
 
-    <span className="max-w-[120px] truncate text-xs font-bold text-zinc-600">
-      {currentUserEmail}
-    </span>
-
-      <button
-        type="button"
-        onClick={handleMyReservations}
-        className="whitespace-nowrap rounded-full bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
-      >
-        {text.myReservations}
-      </button>
+      {!isAdmin && (
+  <button
+    type="button"
+    onClick={handleMyReservations}
+    className="whitespace-nowrap rounded-full bg-red-600 px-3 py-2 text-xs font-black text-white transition hover:bg-red-700"
+  >
+    {text.myReservations}
+  </button>
+)}
 
       {isAdmin && (
   <button
@@ -3898,7 +3980,7 @@ const vanUnavailable =
 
   <a
     href="#reservar"
-    className="whitespace-nowrap rounded-full bg-red-600 px-4 py-2 text-xs font-black text-white shadow-lg transition hover:bg-red-700"
+    className="whitespace-nowrap rounded-full bg-red-600 px-3 py-2 text-xs font-black text-white shadow-md transition hover:bg-red-700"
   >
     {text.bookNow}
   </a>
@@ -3909,7 +3991,7 @@ const vanUnavailable =
     <button
       type="button"
       onClick={() => setMobileMenuOpen((open) => !open)}
-      className="flex items-center gap-3 text-lg font-black text-zinc-950 lg:hidden"
+      className="ml-auto flex items-center gap-3 text-lg font-black text-zinc-950 lg:hidden"
       aria-label={`${mobileMenuOpen ? text.close : text.menu}`}
       aria-expanded={mobileMenuOpen}
     >
@@ -3944,8 +4026,8 @@ const vanUnavailable =
 
   {/* MENÚ DESPLEGABLE - CELULAR */}
   {mobileMenuOpen && (
-    <div className="border-t border-zinc-200 bg-white shadow-xl lg:hidden">
-
+    <div className="absolute left-0 right-0 top-full z-[100] h-[calc(100dvh-96px)] overflow-y-auto overscroll-contain bg-white shadow-xl lg:hidden">
+      
       <div className="mx-auto flex max-w-7xl flex-col px-5 py-4">
 
         <a
@@ -4062,16 +4144,18 @@ const vanUnavailable =
     </p>
   )}
 
-            <button
-  type="button"
-  onClick={() => {
-    setMobileMenuOpen(false);
-    handleMyReservations();
-  }}
-  className="mb-3 w-full rounded-xl bg-red-600 px-5 py-4 font-black text-white transition hover:bg-red-700"
->
-  {text.myReservations}
-</button>
+            {!isAdmin && (
+  <button
+    type="button"
+    onClick={() => {
+      setMobileMenuOpen(false);
+      handleMyReservations();
+    }}
+    className="rounded-xl bg-red-600 px-4 py-3 text-left text-sm font-black text-white"
+  >
+    {text.myReservations}
+  </button>
+)}
 
 {isAdmin && (
   <button
@@ -6586,7 +6670,7 @@ returnTime: returnTime,
                   <img
                     src={review.avatar_url}
                     alt={review.name}
-                    className="h-16 w-16 rounded-full border-2 border-white object-cover shadow-md"
+                    className="h-24 w-24 rounded-full border-2 border-white object-cover object-center shadow-md"
                   />
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 text-xl font-black text-white shadow-md">
