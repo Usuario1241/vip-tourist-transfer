@@ -6655,8 +6655,13 @@ returnTime: returnTime,
   {reviews.length > 0 ? (
     <>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {reviews
-          .slice(
+        {[...reviews]
+  .sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() -
+      new Date(a.created_at).getTime()
+  )
+  .slice(
             currentReviewIndex,
             currentReviewIndex + (reviews.length >= 3 ? 3 : reviews.length)
           )
@@ -6700,7 +6705,7 @@ returnTime: returnTime,
 
               <p className="mt-4 flex-1 leading-7 text-zinc-600">
                “
-{review.name === "Axel Roble"
+{review.id === 3
   ? language === "es"
     ? "Excelente experiencia de prueba. El proceso de reserva fue rápido, sencillo y fácil de usar desde el celular. La información del traslado se muestra claramente y el sistema permite completar la reserva de forma cómoda. Muy buena presentación y funcionamiento."
     : language === "en"
