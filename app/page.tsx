@@ -3880,7 +3880,7 @@ const vanUnavailable =
     </nav>
 
     {/* CUENTA Y RESERVA - COMPUTADORA */}
-<div className="ml-5 hidden items-center gap-3 lg:flex">
+<div className="ml-auto hidden items-center gap-3 lg:flex">
   <div className="relative">
     <select
       value={language}
