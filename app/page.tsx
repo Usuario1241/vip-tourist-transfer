@@ -3874,7 +3874,7 @@ const vanUnavailable =
   {text.reviews}
 </a>
 
-      <a href="#contacto" className="transition hover:text-red-600">
+      <a href="#datos-contacto" className="transition hover:text-red-600">
         {text.contact}
       </a>
     </nav>
@@ -4071,7 +4071,7 @@ const vanUnavailable =
 </a>
 
         <a
-          href="#contacto"
+          href="#datos-contacto"
           onClick={() => setMobileMenuOpen(false)}
           className="border-b border-zinc-100 py-4 text-lg font-black text-zinc-900"
         >
@@ -6998,7 +6998,7 @@ returnTime: returnTime,
     </div>
 
     {/* CONTACTO */}
-<div>
+<div id="datos-contacto" className="scroll-mt-32">
   <p className="text-lg font-black text-white">
     {contactUi[language].contact}
   </p>
