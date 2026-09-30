@@ -3835,7 +3835,7 @@ const vanUnavailable =
   return (
     <main className="min-h-screen overflow-x-hidden bg-white text-zinc-950">
       {/* HEADER */}
-<header className="sticky top-0 z-[200] border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
+<header className="fixed left-0 right-0 top-0 z-[200] border-b border-zinc-200 bg-white/95 backdrop-blur-xl">
 
   <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-2 lg:px-6">
     
@@ -5089,7 +5089,7 @@ const vanUnavailable =
       {/* HERO */}
       <section
         id="inicio"
-        className="relative overflow-hidden bg-zinc-950 text-white"
+        className="relative mt-24 overflow-hidden bg-zinc-950 text-white lg:mt-32"
       >
         <div
           className="absolute inset-0 bg-cover bg-center opacity-100"
