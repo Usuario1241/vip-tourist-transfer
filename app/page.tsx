@@ -7198,7 +7198,7 @@ returnTime: returnTime,
   </p>
 
   <p className="mt-2 text-[10px] tracking-wider text-zinc-700">
-    Website by <span className="font-semibold text-zinc-600">Axel Roble</span>
+    Created by <span className="font-semibold text-zinc-600">Axel Roble</span>
   </p>
 </div>
 </footer>
