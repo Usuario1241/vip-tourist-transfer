@@ -10,6 +10,7 @@ const allowedLanguages = [
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
     const comment = body.comment;
     const language = body.language;
 
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
       typeof comment !== "string" ||
       typeof language !== "string" ||
       !allowedLanguages.includes(language) ||
-      comment.trim().length === 0 ||
+      !comment.trim() ||
       comment.length > 500
     ) {
       return NextResponse.json(
@@ -37,12 +38,23 @@ export async function POST(request: NextRequest) {
     url.searchParams.set("q", comment);
 
     const response = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(7000),
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0"
+      }
     });
 
     if (!response.ok) {
-      throw new Error("No se pudo traducir el comentario");
+      console.error(
+        "Proveedor de traducción:",
+        response.status
+      );
+
+      return NextResponse.json({
+        translated: comment
+      });
     }
 
     const data = await response.json();
@@ -50,20 +62,22 @@ export async function POST(request: NextRequest) {
     const translated = Array.isArray(data?.[0])
       ? data[0]
           .map((part: unknown) =>
-            Array.isArray(part) ? String(part[0] ?? "") : ""
+            Array.isArray(part)
+              ? String(part[0] ?? "")
+              : ""
           )
           .join("")
       : comment;
 
     return NextResponse.json({
-      translated: translated || comment,
+      translated: translated || comment
     });
+
   } catch (error) {
     console.error("Error de traducción:", error);
 
-    return NextResponse.json(
-      { error: "Error al traducir" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      translated: ""
+    });
   }
 }
