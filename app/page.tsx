@@ -181,6 +181,7 @@ type Review = {
 
 const [reviews, setReviews] = useState<Review[]>([]);
 const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
+const [translatedReviews, setTranslatedReviews] = useState<Record<string, string>>({});
 const [reviewName, setReviewName] = useState("");
 const [reviewRating, setReviewRating] = useState(0);
 const [reviewComment, setReviewComment] = useState("");
@@ -2206,6 +2207,34 @@ useEffect(() => {
     setLanguage("en");
   }
 }, []);
+
+useEffect(() => {
+  let cancelled = false;
+  const visible = [...reviews]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(currentReviewIndex, currentReviewIndex + (reviews.length >= 3 ? 3 : reviews.length));
+  for (const review of visible) {
+    const key = `${language}:${review.id}:${review.comment}`;
+    if (translatedReviews[key]) continue;
+    void (async () => {
+      try {
+        const response = await fetch("/api/translate-review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ comment: review.comment, language }),
+        });
+        if (!response.ok) return;
+        const result: { translated?: string } = await response.json();
+        if (!cancelled && result.translated) {
+          setTranslatedReviews((current) => ({ ...current, [key]: result.translated! }));
+        }
+      } catch (error) {
+        console.error("No se pudo traducir el comentario:", error);
+      }
+    })();
+  }
+  return () => { cancelled = true; };
+}, [reviews, language, currentReviewIndex]);
 
 const changeLanguage = (newLanguage: Language) => {
   setLanguage(newLanguage);
@@ -6730,21 +6759,7 @@ returnTime: returnTime,
 
               <p className="mt-4 flex-1 leading-7 text-zinc-600">
                “
-{review.id === 3
-  ? language === "es"
-    ? "Excelente experiencia de prueba. El proceso de reserva fue rápido, sencillo y fácil de usar desde el celular. La información del traslado se muestra claramente y el sistema permite completar la reserva de forma cómoda. Muy buena presentación y funcionamiento."
-    : language === "en"
-    ? "Excellent test experience. The booking process was quick, simple, and easy to use from a mobile phone. The transfer information is displayed clearly, and the system makes it easy to complete the booking. Very good presentation and functionality."
-    : language === "fr"
-    ? "Excellente expérience de test. Le processus de réservation a été rapide, simple et facile à utiliser depuis un téléphone portable. Les informations sur le transfert sont clairement affichées et le système permet de finaliser facilement la réservation. Très bonne présentation et fonctionnement."
-    : language === "de"
-    ? "Ausgezeichnete Testerfahrung. Der Buchungsprozess war schnell, einfach und bequem über das Mobiltelefon zu bedienen. Die Transferinformationen werden klar angezeigt und das System ermöglicht eine unkomplizierte Buchung. Sehr gute Präsentation und Funktionalität."
-    : language === "it"
-    ? "Eccellente esperienza di prova. Il processo di prenotazione è stato rapido, semplice e facile da usare dal cellulare. Le informazioni sul trasferimento sono mostrate chiaramente e il sistema consente di completare comodamente la prenotazione. Ottima presentazione e funzionalità."
-    : language === "pt"
-    ? "Excelente experiência de teste. O processo de reserva foi rápido, simples e fácil de usar pelo celular. As informações do traslado são exibidas claramente e o sistema permite concluir a reserva de forma confortável. Ótima apresentação e funcionamento."
-    : "素晴らしいテスト体験でした。予約手続きは迅速で簡単で、スマートフォンからも使いやすかったです。送迎情報が分かりやすく表示され、スムーズに予約を完了できます。見た目も機能もとても良いです。"
-  : review.comment}
+{translatedReviews[`${language}:${review.id}:${review.comment}`] || review.comment}
 ”
               </p>
 
