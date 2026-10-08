@@ -1040,6 +1040,27 @@ returnTime: string;
   paymentMethod: "card" | "cash";
 } | null>(null);
 
+const sendReservationEmail = async (
+  reservation: NonNullable<typeof confirmedReservation>
+) => {
+  try {
+    const response = await fetch("/api/send-reservation-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...reservation,
+        language,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("No se pudo enviar el correo de confirmación.");
+    }
+  } catch (error) {
+    console.error("Error enviando correo:", error);
+  }
+};
+
 // ============================================================
 // GESTIONAR / CANCELAR RESERVA
 // ============================================================
@@ -6294,7 +6315,7 @@ if (error) {
   return;
 }
 
-  setConfirmedReservation({
+  const emailConfirmation = {
   code: data.reservationCode,
   name: customerName,
   phone: customerPhone,
@@ -6318,7 +6339,9 @@ returnTime: returnTime,
       : "Van Ejecutiva",
   total: finalPrice,
   paymentMethod: "card",
-});
+  } satisfies NonNullable<Parameters<typeof setConfirmedReservation>[0]>;
+  setConfirmedReservation(emailConfirmation);
+  void sendReservationEmail(emailConfirmation);
 
       }}
     />
@@ -6398,7 +6421,7 @@ if (error) {
   return;
 }
 
-  setConfirmedReservation({
+  const emailConfirmation = {
   code: reservationCode,
   name: customerName,
   phone: customerPhone,
@@ -6422,7 +6445,9 @@ returnTime: returnTime,
       : "Van Ejecutiva",
   total: finalPrice,
   paymentMethod: "cash",
-});
+  } satisfies NonNullable<Parameters<typeof setConfirmedReservation>[0]>;
+  setConfirmedReservation(emailConfirmation);
+  void sendReservationEmail(emailConfirmation);
 
     }}
     className="mt-5 w-full rounded-xl bg-zinc-950 px-6 py-4 text-lg font-black text-white transition hover:bg-red-600"
